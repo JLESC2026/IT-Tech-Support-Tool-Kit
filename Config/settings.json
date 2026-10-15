@@ -1,0 +1,12 @@
+{
+  "toolkitName": "IT Technician Toolkit",
+  "loggingEnabled": true,
+  "restartDelaySeconds": 30,
+  "vendorLinks": {
+    "HP": "https://support.hp.com",
+    "Canon": "https://www.usa.canon.com/support",
+    "Epson": "https://epson.com/support",
+    "Brother": "https://support.brother.com",
+    "Other": "https://www.google.com/search?q=printer+driver+download"
+  }
+}

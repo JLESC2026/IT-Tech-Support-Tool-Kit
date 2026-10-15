@@ -1,0 +1,109 @@
+{
+  "categories": [
+    {
+      "id": "quickfix",
+      "title": "⚡ Quick Fix",
+      "items": [
+        { "group": "Windows", "name": "Restart Windows Explorer", "desc": "Restarts explorer.exe (taskbar, desktop, file windows)", "script": "QuickFix\\Restart-Explorer.ps1" },
+        { "group": "Windows", "name": "Restart Windows Update", "desc": "Restarts Windows Update, BITS and the update orchestrator", "script": "QuickFix\\Restart-Windows-Update.ps1", "admin": true },
+        { "group": "Windows", "name": "Clear temporary files", "desc": "Deletes user and Windows temp files (locked files are skipped)", "script": "QuickFix\\Clear-Temp-Files.ps1", "confirm": "Delete temporary files from this computer?" },
+        { "group": "Windows", "name": "Restart computer", "desc": "Restarts this PC after a short countdown", "script": "QuickFix\\Restart-PC.ps1", "confirm": "Restart this computer? Unsaved work will be lost." },
+        { "group": "Windows", "name": "Restart common services", "desc": "Restarts spooler, WIA, audio, Bluetooth and Windows Update services", "script": "QuickFix\\Restart-Common-Services.ps1", "admin": true },
+
+        { "group": "Printer", "name": "Restart Print Spooler", "desc": "Restarts the Print Spooler service", "script": "Printers\\Restart-Print-Spooler.ps1", "admin": true },
+        { "group": "Printer", "name": "Clear print queue", "desc": "Stops the spooler, deletes stuck jobs, starts the spooler again", "script": "Printers\\Clear-Print-Queue.ps1", "admin": true, "confirm": "Delete ALL pending print jobs on this computer?" },
+        { "group": "Printer", "name": "Restart printer services", "desc": "Restarts spooler, printer notifications and discovery services", "script": "Printers\\Restart-Printer-Services.ps1", "admin": true },
+        { "group": "Printer", "name": "Detect printers", "desc": "Lists installed printers, drivers, ports and status", "script": "Printers\\Detect-Printers.ps1" },
+        { "group": "Printer", "name": "Print test page", "desc": "Prints a Windows test page on the default printer", "script": "Printers\\Print-Test-Page.ps1" },
+
+        { "group": "Scanner", "name": "Restart scanner services", "desc": "Restarts WIA and related scanner services", "script": "Scanners\\Restart-Scanner-Services.ps1", "admin": true },
+        { "group": "Scanner", "name": "Restart WIA service", "desc": "Restarts Windows Image Acquisition", "script": "Scanners\\Restart-WIA.ps1", "admin": true },
+        { "group": "Scanner", "name": "Detect scanners", "desc": "Lists scanners and imaging devices Windows can see", "script": "Scanners\\Detect-Scanners.ps1" },
+
+        { "group": "Network", "name": "Flush DNS", "desc": "Clears the DNS resolver cache", "script": "Network\\Flush-DNS.ps1" },
+        { "group": "Network", "name": "Renew IP / DHCP", "desc": "Releases and renews the IP address", "script": "Network\\Renew-IP.ps1", "admin": true },
+        { "group": "Network", "name": "Reset Winsock", "desc": "Resets the Winsock catalog (restart needed afterwards)", "script": "Network\\Reset-Winsock.ps1", "admin": true, "confirm": "Reset Winsock? A restart is required afterwards." },
+        { "group": "Network", "name": "Reset TCP/IP", "desc": "Resets the TCP/IP stack (restart needed afterwards)", "script": "Network\\Reset-TCPIP.ps1", "admin": true, "confirm": "Reset the TCP/IP stack? A restart is required afterwards." },
+        { "group": "Network", "name": "Restart network adapter", "desc": "Disables and re-enables a network adapter", "script": "Network\\Restart-Network-Adapter.ps1", "admin": true, "confirm": "Restart the network adapter? The connection will drop briefly." },
+        { "group": "Network", "name": "Restart Wi-Fi (WLAN) service", "desc": "Restarts WLAN AutoConfig", "script": "Network\\Restart-WLAN-Service.ps1", "admin": true },
+        { "group": "Network", "name": "Test internet connection", "desc": "Checks gateway, DNS and internet reachability", "script": "Network\\Test-Internet.ps1" },
+
+        { "group": "Other", "name": "Restart Windows Audio", "desc": "Restarts the audio services", "script": "QuickFix\\Restart-Audio.ps1", "admin": true },
+        { "group": "Other", "name": "Restart Bluetooth", "desc": "Restarts the Bluetooth support services", "script": "QuickFix\\Restart-Bluetooth.ps1", "admin": true },
+        { "group": "Other", "name": "Restart selected service", "desc": "Pick any service from a list and restart it", "script": "QuickFix\\Restart-Selected-Service.ps1", "admin": true }
+      ]
+    },
+    { "id": "windows", "title": "🪟 Windows Issues", "items": [] },
+    {
+      "id": "printers",
+      "title": "🖨 Printer / Scanner Issues",
+      "items": [
+        { "group": "Printer", "name": "Detect printers", "desc": "Lists installed printers, drivers, ports and status", "script": "Printers\\Detect-Printers.ps1" },
+        { "group": "Printer", "name": "Show default printer", "desc": "Shows which printer is the default", "script": "Printers\\Show-Default-Printer.ps1" },
+        { "group": "Printer", "name": "Check printer status", "desc": "Status, errors, offline state and queued jobs per printer", "script": "Printers\\Check-Printer-Status.ps1" },
+        { "group": "Printer", "name": "Restart Print Spooler", "desc": "Restarts the Print Spooler service", "script": "Printers\\Restart-Print-Spooler.ps1", "admin": true },
+        { "group": "Printer", "name": "Clear print queue", "desc": "Deletes stuck print jobs", "script": "Printers\\Clear-Print-Queue.ps1", "admin": true, "confirm": "Delete ALL pending print jobs on this computer?" },
+        { "group": "Printer", "name": "Restart printer services", "desc": "Spooler, printer notifications, discovery services", "script": "Printers\\Restart-Printer-Services.ps1", "admin": true },
+        { "group": "Printer", "name": "Remove and re-detect printer", "desc": "Removes a printer, rescans devices and re-adds it if needed", "script": "Printers\\Remove-and-Redetect-Printer.ps1", "admin": true, "confirm": "This removes a printer from this computer. Continue?" },
+        { "group": "Printer", "name": "Check printer ports", "desc": "Tests whether network printer ports are reachable", "script": "Printers\\Check-Printer-Ports.ps1" },
+        { "group": "Printer", "name": "Check printer drivers", "desc": "Lists drivers and finds printers with missing drivers", "script": "Printers\\Check-Printer-Drivers.ps1" },
+        { "group": "Printer", "name": "Print test page (default)", "desc": "Prints a test page on the default printer", "script": "Printers\\Print-Test-Page.ps1" },
+        { "group": "Printer", "name": "Print test page (choose printer)", "desc": "Pick a printer, then print a test page", "script": "Printers\\Print-Test-Page-Select.ps1" },
+        { "group": "Printer", "name": "Printer preferences / maintenance", "desc": "Opens the driver preferences (Maintenance tab: nozzle check, head cleaning)", "script": "Printers\\Printer-Preferences.ps1" },
+        { "group": "Printer", "name": "Printer diagnostics", "desc": "Full printer health check including recent print errors", "script": "Printers\\Printer-Diagnostics.ps1" },
+        { "group": "Printer", "name": "Printers & scanners settings", "desc": "Opens the Windows printer settings page", "type": "run", "path": "ms-settings:printers" },
+        { "group": "Printer", "name": "Devices and Printers", "desc": "Opens the classic Devices and Printers window", "type": "run", "path": "control.exe", "args": "printers" },
+        { "group": "Printer", "name": "Print server properties", "desc": "Opens print server properties (Drivers tab)", "type": "run", "path": "rundll32.exe", "args": "printui.dll,PrintUIEntry /s /t2" },
+
+        { "group": "Scanner", "name": "Detect scanners", "desc": "Lists scanners and imaging devices Windows can see", "script": "Scanners\\Detect-Scanners.ps1" },
+        { "group": "Scanner", "name": "Check scanner status", "desc": "Device status, problem codes and WIA service state", "script": "Scanners\\Check-Scanner-Status.ps1" },
+        { "group": "Scanner", "name": "Restart WIA service", "desc": "Restarts Windows Image Acquisition", "script": "Scanners\\Restart-WIA.ps1", "admin": true },
+        { "group": "Scanner", "name": "Restart scanner services", "desc": "WIA and related scanner services", "script": "Scanners\\Restart-Scanner-Services.ps1", "admin": true },
+        { "group": "Scanner", "name": "Scanner diagnostics", "desc": "Full scanner health check with next-step tips", "script": "Scanners\\Scanner-Diagnostics.ps1" },
+        { "group": "Scanner", "name": "Check Device Manager", "desc": "Opens Device Manager", "type": "run", "path": "devmgmt.msc" },
+        { "group": "Scanner", "name": "Scanners settings", "desc": "Opens Windows printers and scanners settings", "type": "run", "path": "ms-settings:printers" },
+        { "group": "Scanner", "name": "Windows Fax and Scan", "desc": "Opens the built-in scan application", "type": "run", "path": "wfs.exe" },
+
+        { "group": "Manufacturer Tools", "name": "HP", "desc": "HP tools from the Manufacturer\\HP folder, or the HP support site", "script": "Manufacturer\\Open-Vendor-Tools.ps1", "args": "-Vendor HP" },
+        { "group": "Manufacturer Tools", "name": "Canon", "desc": "Canon tools from the Manufacturer\\Canon folder, or the Canon support site", "script": "Manufacturer\\Open-Vendor-Tools.ps1", "args": "-Vendor Canon" },
+        { "group": "Manufacturer Tools", "name": "Epson", "desc": "Epson tools from the Manufacturer\\Epson folder, or the Epson support site", "script": "Manufacturer\\Open-Vendor-Tools.ps1", "args": "-Vendor Epson" },
+        { "group": "Manufacturer Tools", "name": "Brother", "desc": "Brother tools from the Manufacturer\\Brother folder, or the Brother support site", "script": "Manufacturer\\Open-Vendor-Tools.ps1", "args": "-Vendor Brother" },
+        { "group": "Manufacturer Tools", "name": "Other", "desc": "Other vendors (Xerox, Ricoh, Kyocera, Samsung ...)", "script": "Manufacturer\\Open-Vendor-Tools.ps1", "args": "-Vendor Other" }
+      ]
+    },
+    { "id": "network", "title": "🌐 Network Issues", "items": [] },
+    {
+      "id": "services",
+      "title": "🔄 Services",
+      "items": [
+        { "group": "Service Center", "name": "Service Center", "desc": "Search services and Start / Stop / Restart them", "script": "Services\\Service-Center.ps1", "type": "gui" },
+        { "group": "Service Center", "name": "Common services status", "desc": "Status of the services technicians restart most", "script": "Services\\Service-Status.ps1" },
+        { "group": "Service Center", "name": "Restart selected service", "desc": "Pick any service from a list and restart it", "script": "QuickFix\\Restart-Selected-Service.ps1", "admin": true },
+        { "group": "Service Center", "name": "Open Services Manager", "desc": "Opens services.msc", "type": "run", "path": "services.msc" },
+
+        { "group": "Restart a service", "name": "Print Spooler", "desc": "Printing", "script": "Services\\Service-Control.ps1", "args": "-Name Spooler -Label 'Print Spooler' -Action Restart", "admin": true },
+        { "group": "Restart a service", "name": "Windows Image Acquisition (WIA)", "desc": "Scanning", "script": "Services\\Service-Control.ps1", "args": "-Name stisvc -Label 'Windows Image Acquisition (WIA)' -Action Restart", "admin": true },
+        { "group": "Restart a service", "name": "WLAN AutoConfig", "desc": "Wi-Fi (the Wi-Fi connection will drop briefly)", "script": "Services\\Service-Control.ps1", "args": "-Name WlanSvc -Label 'WLAN AutoConfig' -Action Restart", "admin": true },
+        { "group": "Restart a service", "name": "DHCP Client", "desc": "Networking", "script": "Services\\Service-Control.ps1", "args": "-Name Dhcp -Label 'DHCP Client' -Action Restart", "admin": true },
+        { "group": "Restart a service", "name": "DNS Client", "desc": "Networking", "script": "Services\\Service-Control.ps1", "args": "-Name Dnscache -Label 'DNS Client' -Action Restart", "admin": true },
+        { "group": "Restart a service", "name": "Network Connections", "desc": "Networking", "script": "Services\\Service-Control.ps1", "args": "-Name Netman -Label 'Network Connections' -Action Restart", "admin": true },
+        { "group": "Restart a service", "name": "Windows Audio", "desc": "Audio", "script": "Services\\Service-Control.ps1", "args": "-Name Audiosrv -Label 'Windows Audio' -Action Restart", "admin": true },
+        { "group": "Restart a service", "name": "Bluetooth Support Service", "desc": "Bluetooth", "script": "Services\\Service-Control.ps1", "args": "-Name bthserv -Label 'Bluetooth Support Service' -Action Restart", "admin": true },
+        { "group": "Restart a service", "name": "Windows Update", "desc": "Windows", "script": "Services\\Service-Control.ps1", "args": "-Name wuauserv -Label 'Windows Update' -Action Restart", "admin": true },
+        { "group": "Restart a service", "name": "BITS", "desc": "Background Intelligent Transfer Service", "script": "Services\\Service-Control.ps1", "args": "-Name BITS -Label 'BITS' -Action Restart", "admin": true }
+      ]
+    },
+    { "id": "hardware", "title": "🔧 Hardware / Devices", "items": [] },
+    { "id": "diagnostics", "title": "🔍 Diagnostics", "items": [] },
+    { "id": "portable", "title": "🧰 Portable Tools", "items": [] },
+    {
+      "id": "advanced",
+      "title": "⚠ Advanced / Hardcore",
+      "items": [
+        { "group": "Services", "name": "Service configuration", "desc": "Read-only: account, path, startup type, recovery actions", "script": "Advanced\\Service-Configuration.ps1" },
+        { "group": "Services", "name": "Startup configuration", "desc": "Change a service's startup type (Automatic / Manual / Disabled)", "script": "Advanced\\Startup-Configuration.ps1", "admin": true },
+        { "group": "Services", "name": "Service dependencies", "desc": "Shows what a service needs and what depends on it", "script": "Advanced\\Service-Dependencies.ps1" }
+      ]
+    }
+  ]
+}
