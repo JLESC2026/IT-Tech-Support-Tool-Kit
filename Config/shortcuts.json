@@ -1,9 +1,16 @@
-{
+﻿{
     "categories":  [
                        {
                            "id":  "quickfix",
                            "title":  "⚡ Quick Fix",
                            "items":  [
+                                         {
+                                             "group":  "Guided",
+                                             "name":  "Troubleshooting Wizard",
+                                             "desc":  "Pick the problem; the toolkit runs the checks and fixes step by step and explains each one",
+                                             "script":  "Wizard\\Troubleshooting-Wizard.ps1",
+                                             "type":  "gui"
+                                         },
                                          {
                                              "group":  "Windows",
                                              "name":  "Restart Windows Explorer",
@@ -995,20 +1002,248 @@
                            "id":  "diagnostics",
                            "title":  "🔍 Diagnostics",
                            "items":  [
-
+                                         {
+                                             "group":  "Computer information",
+                                             "name":  "Computer Information (Copy All)",
+                                             "desc":  "Computer, Windows, CPU, RAM, GPU, model, BIOS, serial, drive and network details with a Copy All button",
+                                             "script":  "Diagnostics\\Computer-Information.ps1",
+                                             "type":  "gui"
+                                         },
+                                         {
+                                             "group":  "Report",
+                                             "name":  "Generate diagnostic report",
+                                             "desc":  "Creates Reports\\COMPUTER_DATE\\ with System, Network, Printers, Scanners, Services, Drivers, Disks and EventLogs text files",
+                                             "script":  "Diagnostics\\Generate-Report.ps1"
+                                         },
+                                         {
+                                             "group":  "Guided",
+                                             "name":  "Troubleshooting Wizard",
+                                             "desc":  "Pick the problem; the toolkit runs the checks and fixes step by step and explains each one",
+                                             "script":  "Wizard\\Troubleshooting-Wizard.ps1",
+                                             "type":  "gui"
+                                         },
+                                         {
+                                             "group":  "Diagnostics",
+                                             "name":  "System information",
+                                             "desc":  "Uptime, memory, disk space, pending restart, top processes and recent updates",
+                                             "script":  "Diagnostics\\System-Diagnostics.ps1"
+                                         },
+                                         {
+                                             "group":  "Diagnostics",
+                                             "name":  "Hardware information",
+                                             "desc":  "CPU, RAM modules, BIOS, board, GPU, disks, battery",
+                                             "script":  "Hardware\\Hardware-Info.ps1"
+                                         },
+                                         {
+                                             "group":  "Diagnostics",
+                                             "name":  "Network diagnostics",
+                                             "desc":  "Adapters, gateway / DNS / internet tests, firewall profiles and network services",
+                                             "script":  "Diagnostics\\Network-Diagnostics.ps1"
+                                         },
+                                         {
+                                             "group":  "Diagnostics",
+                                             "name":  "Printer diagnostics",
+                                             "desc":  "Full printer health check including recent print errors",
+                                             "script":  "Printers\\Printer-Diagnostics.ps1"
+                                         },
+                                         {
+                                             "group":  "Diagnostics",
+                                             "name":  "Scanner diagnostics",
+                                             "desc":  "Full scanner health check with next-step tips",
+                                             "script":  "Scanners\\Scanner-Diagnostics.ps1"
+                                         },
+                                         {
+                                             "group":  "Diagnostics",
+                                             "name":  "Windows services",
+                                             "desc":  "Status of the services technicians restart most",
+                                             "script":  "Services\\Service-Status.ps1"
+                                         },
+                                         {
+                                             "group":  "Diagnostics",
+                                             "name":  "Disk health",
+                                             "desc":  "Disk health, partitions, free space and reliability counters",
+                                             "script":  "Hardware\\Storage-Info.ps1"
+                                         },
+                                         {
+                                             "group":  "Diagnostics",
+                                             "name":  "Driver information",
+                                             "desc":  "Driver problems, unsigned drivers, key and oldest drivers",
+                                             "script":  "Hardware\\Driver-Info.ps1"
+                                         },
+                                         {
+                                             "group":  "Diagnostics",
+                                             "name":  "Recent errors (event logs)",
+                                             "desc":  "Latest critical and error events from the System and Application logs",
+                                             "script":  "Diagnostics\\Recent-Events.ps1"
+                                         },
+                                         {
+                                             "group":  "Windows tools",
+                                             "name":  "Device Manager",
+                                             "desc":  "Opens Device Manager",
+                                             "type":  "run",
+                                             "path":  "devmgmt.msc"
+                                         },
+                                         {
+                                             "group":  "Windows tools",
+                                             "name":  "Event Viewer",
+                                             "desc":  "Opens the Windows Event Viewer",
+                                             "type":  "run",
+                                             "path":  "eventvwr.msc"
+                                         },
+                                         {
+                                             "group":  "Toolkit self-check",
+                                             "name":  "Syntax check (all scripts)",
+                                             "desc":  "Parses every toolkit script and reports syntax errors",
+                                             "script":  "Diagnostics\\Check-Syntax.ps1"
+                                         },
+                                         {
+                                             "group":  "Toolkit self-check",
+                                             "name":  "Wiring check (all buttons)",
+                                             "desc":  "Checks that every button points to a real file with valid parameters",
+                                             "script":  "Diagnostics\\Check-Wiring.ps1"
+                                         }
                                      ]
                        },
                        {
                            "id":  "portable",
                            "title":  "🧰 Portable Tools",
                            "items":  [
-
+                                         {
+                                             "group":  "Launch",
+                                             "name":  "All portable tools",
+                                             "desc":  "Lists every portable program found in PortableApps and launches the one you pick",
+                                             "script":  "PortableApps\\Portable-Launcher.ps1",
+                                             "args":  "-Category All"
+                                         },
+                                         {
+                                             "group":  "Launch",
+                                             "name":  "File Management",
+                                             "desc":  "Portable programs in PortableApps\\File-Management (shows download links when empty)",
+                                             "script":  "PortableApps\\Portable-Launcher.ps1",
+                                             "args":  "-Category File-Management"
+                                         },
+                                         {
+                                             "group":  "Launch",
+                                             "name":  "Hardware Diagnostics",
+                                             "desc":  "Portable programs in PortableApps\\Hardware-Diagnostics (shows download links when empty)",
+                                             "script":  "PortableApps\\Portable-Launcher.ps1",
+                                             "args":  "-Category Hardware-Diagnostics"
+                                         },
+                                         {
+                                             "group":  "Launch",
+                                             "name":  "Disk Health",
+                                             "desc":  "Portable programs in PortableApps\\Disk-Health (shows download links when empty)",
+                                             "script":  "PortableApps\\Portable-Launcher.ps1",
+                                             "args":  "-Category Disk-Health"
+                                         },
+                                         {
+                                             "group":  "Launch",
+                                             "name":  "Network Tools",
+                                             "desc":  "Portable programs in PortableApps\\Network-Tools (shows download links when empty)",
+                                             "script":  "PortableApps\\Portable-Launcher.ps1",
+                                             "args":  "-Category Network-Tools"
+                                         },
+                                         {
+                                             "group":  "Launch",
+                                             "name":  "Text Editors",
+                                             "desc":  "Portable programs in PortableApps\\Text-Editors (shows download links when empty)",
+                                             "script":  "PortableApps\\Portable-Launcher.ps1",
+                                             "args":  "-Category Text-Editors"
+                                         },
+                                         {
+                                             "group":  "Launch",
+                                             "name":  "Archive Utilities",
+                                             "desc":  "Portable programs in PortableApps\\Archive-Utilities (shows download links when empty)",
+                                             "script":  "PortableApps\\Portable-Launcher.ps1",
+                                             "args":  "-Category Archive-Utilities"
+                                         },
+                                         {
+                                             "group":  "Launch",
+                                             "name":  "Other IT Utilities",
+                                             "desc":  "Portable programs in PortableApps\\Other-IT-Utilities (shows download links when empty)",
+                                             "script":  "PortableApps\\Portable-Launcher.ps1",
+                                             "args":  "-Category Other-IT-Utilities"
+                                         },
+                                         {
+                                             "group":  "Folder",
+                                             "name":  "Open PortableApps folder",
+                                             "desc":  "Opens the PortableApps folder (add or update portable programs here)",
+                                             "script":  "PortableApps\\Portable-Launcher.ps1",
+                                             "args":  "-OpenFolder"
+                                         }
                                      ]
                        },
                        {
                            "id":  "advanced",
                            "title":  "⚠ Advanced / Hardcore",
                            "items":  [
+                                         {
+                                             "group":  "Windows repair",
+                                             "name":  "SFC scan and repair (advanced)",
+                                             "desc":  "System File Checker: scans and repairs protected Windows files (10-30 min)",
+                                             "script":  "Windows\\SFC-Scan.ps1",
+                                             "admin":  true,
+                                             "confirm":  "Run System File Checker (sfc /scannow)? It can take 10-30 minutes and may change system files."
+                                         },
+                                         {
+                                             "group":  "Windows repair",
+                                             "name":  "DISM RestoreHealth (advanced)",
+                                             "desc":  "Repairs the Windows image from Windows Update (internet, 10-30 min)",
+                                             "script":  "Windows\\DISM-Repair.ps1",
+                                             "admin":  true,
+                                             "args":  "-Mode RestoreHealth",
+                                             "confirm":  "Run DISM RestoreHealth? It repairs the Windows component store using Windows Update, needs internet and can take 10-30 minutes."
+                                         },
+                                         {
+                                             "group":  "Windows repair",
+                                             "name":  "Component store cleanup (advanced)",
+                                             "desc":  "Removes superseded component versions (DISM StartComponentCleanup)",
+                                             "script":  "Windows\\Component-Store-Cleanup.ps1",
+                                             "admin":  true,
+                                             "confirm":  "Clean up the Windows component store? This removes superseded update files and can take several minutes."
+                                         },
+                                         {
+                                             "group":  "Windows repair",
+                                             "name":  "Windows Update repair (advanced)",
+                                             "desc":  "Resets update services and renames SoftwareDistribution / catroot2",
+                                             "script":  "Windows\\Repair-Windows-Update.ps1",
+                                             "admin":  true,
+                                             "confirm":  "Reset the Windows Update components? Services are stopped, the update cache folders are renamed and pending downloads are discarded."
+                                         },
+                                         {
+                                             "group":  "Network",
+                                             "name":  "Reset Winsock",
+                                             "desc":  "Resets the Winsock catalog (restart needed afterwards)",
+                                             "script":  "Network\\Reset-Winsock.ps1",
+                                             "admin":  true,
+                                             "confirm":  "Reset Winsock? A restart is required afterwards."
+                                         },
+                                         {
+                                             "group":  "Network",
+                                             "name":  "Reset TCP/IP",
+                                             "desc":  "Resets the TCP/IP stack (restart needed afterwards)",
+                                             "script":  "Network\\Reset-TCPIP.ps1",
+                                             "admin":  true,
+                                             "confirm":  "Reset the TCP/IP stack? A restart is required afterwards."
+                                         },
+                                         {
+                                             "group":  "Network",
+                                             "name":  "Routing table (route print)",
+                                             "desc":  "Routing table",
+                                             "script":  "Network\\Route-Print.ps1"
+                                         },
+                                         {
+                                             "group":  "Network",
+                                             "name":  "ARP table (arp -a)",
+                                             "desc":  "ARP table (IP to MAC of neighbours)",
+                                             "script":  "Network\\ARP-Table.ps1"
+                                         },
+                                         {
+                                             "group":  "Network",
+                                             "name":  "Firewall diagnostics",
+                                             "desc":  "Read-only check of firewall service, profiles, relevant rules and block rules",
+                                             "script":  "Advanced\\Firewall-Diagnostics.ps1"
+                                         },
                                          {
                                              "group":  "Services",
                                              "name":  "Service configuration",
@@ -1027,6 +1262,95 @@
                                              "name":  "Service dependencies",
                                              "desc":  "Shows what a service needs and what depends on it",
                                              "script":  "Advanced\\Service-Dependencies.ps1"
+                                         },
+                                         {
+                                             "group":  "Storage",
+                                             "name":  "CHKDSK scan (read-only)",
+                                             "desc":  "Checks a drive for file system errors without changing anything",
+                                             "script":  "Advanced\\CHKDSK-Tool.ps1",
+                                             "args":  "-Mode ReadOnly",
+                                             "admin":  true
+                                         },
+                                         {
+                                             "group":  "Storage",
+                                             "name":  "CHKDSK repair /F (advanced)",
+                                             "desc":  "Fixes file system errors; the drive is locked or the check is scheduled for the next restart",
+                                             "script":  "Advanced\\CHKDSK-Tool.ps1",
+                                             "args":  "-Mode Fix",
+                                             "admin":  true,
+                                             "confirm":  "CHKDSK /F changes the file system and may lock the drive or require a restart. Back up important data first. Continue?"
+                                         },
+                                         {
+                                             "group":  "Storage",
+                                             "name":  "CHKDSK surface scan /R (advanced)",
+                                             "desc":  "Fixes errors and scans the whole surface for bad sectors - can take hours",
+                                             "script":  "Advanced\\CHKDSK-Tool.ps1",
+                                             "args":  "-Mode Surface",
+                                             "admin":  true,
+                                             "confirm":  "CHKDSK /R can take several hours and locks the drive or runs at the next restart. Continue?"
+                                         },
+                                         {
+                                             "group":  "Storage",
+                                             "name":  "SMART information",
+                                             "desc":  "Drive health prediction and key SMART attributes (needs administrator)",
+                                             "script":  "Advanced\\SMART-Info.ps1",
+                                             "admin":  true
+                                         },
+                                         {
+                                             "group":  "Storage",
+                                             "name":  "Disk Management",
+                                             "desc":  "Opens Disk Management (partitions and volumes)",
+                                             "type":  "run",
+                                             "path":  "diskmgmt.msc"
+                                         },
+                                         {
+                                             "group":  "Storage",
+                                             "name":  "Storage diagnostics",
+                                             "desc":  "Disk health, partitions, free space and reliability counters",
+                                             "script":  "Hardware\\Storage-Info.ps1"
+                                         },
+                                         {
+                                             "group":  "System",
+                                             "name":  "Registry Editor",
+                                             "desc":  "Opens regedit",
+                                             "script":  "Advanced\\Open-Registry-Editor.ps1",
+                                             "confirm":  "Wrong changes in the registry can stop Windows from working. Open the Registry Editor?"
+                                         },
+                                         {
+                                             "group":  "System",
+                                             "name":  "Event Viewer",
+                                             "desc":  "Opens the Windows Event Viewer",
+                                             "type":  "run",
+                                             "path":  "eventvwr.msc"
+                                         },
+                                         {
+                                             "group":  "System",
+                                             "name":  "Task Scheduler",
+                                             "desc":  "Opens Task Scheduler",
+                                             "type":  "run",
+                                             "path":  "taskschd.msc"
+                                         },
+                                         {
+                                             "group":  "System",
+                                             "name":  "Device Manager",
+                                             "desc":  "Opens Device Manager",
+                                             "type":  "run",
+                                             "path":  "devmgmt.msc"
+                                         },
+                                         {
+                                             "group":  "System",
+                                             "name":  "Local users (list)",
+                                             "desc":  "Lists local user accounts and the Administrators group (read-only)",
+                                             "script":  "Advanced\\Local-Users.ps1"
+                                         },
+                                         {
+                                             "group":  "System",
+                                             "name":  "Local Users and Groups (open console)",
+                                             "desc":  "Lists the accounts and opens the Local Users and Groups console",
+                                             "script":  "Advanced\\Local-Users.ps1",
+                                             "args":  "-Open",
+                                             "admin":  true,
+                                             "confirm":  "Local Users and Groups can change or lock user accounts. Open the console?"
                                          }
                                      ]
                        }

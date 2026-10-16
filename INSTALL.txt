@@ -1,0 +1,9 @@
+IT Technician Toolkit - Part 4 (Diagnostics, Advanced, Wizard, Portable Tools, self-checks)
+
+Merge into the toolkit (run from this folder):
+
+  powershell -NoProfile -ExecutionPolicy Bypass -File ".\Merge-Part4.ps1" -Destination "F:\Projects\IT Tech Support Tool Kit"
+
+Add -DryRun to preview without changing anything, -SkipChecks to skip the final syntax/wiring checks.
+Or double-click Merge-Part4.bat (uses the same default destination).
+Changed files are backed up to Config\backup\part4-<timestamp>\ inside the toolkit.

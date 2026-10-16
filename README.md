@@ -1,4 +1,4 @@
-# IT Technician Toolkit
+﻿# IT Technician Toolkit
 
 A portable Windows troubleshooting dashboard for day-to-day IT support. It brings common fixes, diagnostic commands, and built-in Windows tools together in one place so a technician can quickly investigate issues with Windows, printers, scanners, networks, services, and hardware.
 
@@ -103,3 +103,18 @@ Place legitimate vendor utilities in `Manufacturer\HP`, `Manufacturer\Canon`, `M
 ## Use with care
 
 This toolkit can change Windows services, networking, system files, and device configuration. Review prompts, understand the selected operation, and make sure you have appropriate authorization and backups before applying repairs. The toolkit is intended for authorized IT support.
+
+## Part 4 - Diagnostics, Advanced, Wizard and Finish
+| Section | Contents |
+|---|---|
+| Diagnostics | Computer Information window (with **Copy All Information**), Generate diagnostic report, system / network / printer / scanner diagnostics, services, hardware, drivers, disk health, recent event-log errors, Device Manager, Event Viewer |
+| Advanced / Hardcore | Windows repair (SFC, DISM, component store, Windows Update repair), network resets, routing / ARP, firewall diagnostics, CHKDSK (read-only / fix / surface), SMART, Disk Management, Registry Editor, Task Scheduler, Local Users, service configuration |
+| Troubleshooting Wizard | Pick the problem (printer, scanner, no internet, Wi-Fi, slow Windows, no sound, USB, driver, other). It runs the checks, explains each step, asks before any fix and records the result in the log. Also at the top of Quick Fix. |
+| Portable Tools | Launches programs from `PortableApps\<category>`; `PortableApps\README.txt` lists the official download pages |
+| Self-check | Diagnostics > Toolkit self-check: syntax check of every script and a wiring check of every button |
+
+Diagnostic report: `Reports\COMPUTERNAME_yyyy-MM-dd_HHmm\` with `System.txt`, `Network.txt`, `Printers.txt`, `Scanners.txt`, `Services.txt`, `Drivers.txt`, `Disks.txt`, `EventLogs.txt`.
+Run it as administrator for complete SMART, driver and event-log data.
+
+Part 4 files: `Diagnostics\`, `Advanced\`, `Wizard\`, `PortableApps\`, `Launcher\Part4-Helpers.ps1`.
+Anything that changes the system (CHKDSK repair, registry, resets) shows a confirmation first and needs administrator rights.
