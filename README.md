@@ -1,104 +1,103 @@
 ﻿# IT Technician Toolkit
 
-A portable Windows troubleshooting dashboard for day-to-day IT support. It brings common fixes, diagnostic commands, and built-in Windows tools together in one place so a technician can quickly investigate issues with Windows, printers, scanners, networks, services, and hardware.
+A portable Windows troubleshooting dashboard for day-to-day IT support. It puts common fixes, diagnostic commands and built-in Windows tools in one window, so a technician can quickly investigate and repair problems with Windows, printers, scanners, networks, services and hardware, without remembering commands or hunting through menus.
 
-> **This is not a bootable Windows installer or recovery USB.** It is a toolkit that runs inside Windows.
+> **This is not a bootable Windows installer or recovery USB.** It runs inside Windows, on a PC that already starts.
 
-## Project status
+## What it does
 
-**Parts 1-4 are complete.** The toolkit includes the launcher, all support tools, the diagnostics and report generator, the guided Troubleshooting Wizard, the Portable Tools launcher, and the built-in self-checks.
-
-The toolkit has so far been tested on a single development PC. Test it on a spare machine or VM before using it on production computers (see [Before using it on other computers](#before-using-it-on-other-computers)).
-
-## Features
-
-### Dashboard and Quick Fix
-
-- **Dashboard:** Searchable, category-based interface with a live output pane, a Copy output button, and a log toggle.
-- **Quick Fix:** Restart Explorer, Windows Update, audio, Bluetooth, common or selected services, and the PC; clear temporary files. The Troubleshooting Wizard is also available at the top of this section.
-
-### Printers, scanners and services
-
-- **Printer support:** Detect printers, inspect status, default printer, ports and drivers, clear the print queue, restart printer services, remove and re-detect a printer, open preferences, and print a test page.
-- **Scanner support:** Detect scanners, inspect status, restart scanner services or WIA, and run scanner diagnostics.
-- **Services:** Service Center window (search, start, stop, restart), status of common services, and one-click restarts.
-- **Manufacturer tools:** Open vendor utilities placed in the matching manufacturer folder, or visit the configured vendor support pages.
-
-### Network, Windows and hardware
-
-- **Network:** Network Center live window, network and Wi-Fi information, copy IP/MAC/network details, test internet, gateway and DNS, inspect adapters, and run common network repairs. Advanced tools include `ipconfig`, route and ARP tables, `netstat`, `nslookup`, `tracert`, and `Test-NetConnection`.
-- **Windows:** Run SFC and DISM repairs, analyze or clean the component store, repair Windows Update, run Disk Cleanup, and check Windows version/build information.
-- **Hardware:** Inspect problem and connected devices, rescan hardware, troubleshoot USB, and view driver, audio, Bluetooth, display/GPU, storage, and general hardware information.
-
-### Part 4: Diagnostics, Wizard, Portable Tools and Advanced
-
-| Section | Contents |
-|---|---|
-| Diagnostics | Computer Information window (with **Copy All Information**), Generate diagnostic report, system / network / printer / scanner diagnostics, services, hardware, drivers, disk health, recent event-log errors, Device Manager, Event Viewer |
-| Troubleshooting Wizard | Pick the problem (printer, scanner, no internet, Wi-Fi, slow Windows, no sound, USB, driver, other). It runs the checks, explains each step, asks before any fix and records the result in the log. |
-| Portable Tools | Launches programs from `PortableApps\<category>`; `PortableApps\README.txt` lists the official download pages |
-| Advanced / Hardcore | Windows repair (SFC, DISM, component store, Windows Update repair), network resets, routing / ARP, firewall diagnostics, CHKDSK (read-only / fix / surface), SMART, Disk Management, Registry Editor, Task Scheduler, Local Users, service configuration and dependencies |
-| Self-check | Diagnostics > Toolkit self-check: a syntax check of every script and a wiring check of every button |
-
-**Diagnostic report:** `Reports\COMPUTERNAME_yyyy-MM-dd_HHmm\` containing `System.txt`, `Network.txt`, `Printers.txt`, `Scanners.txt`, `Services.txt`, `Drivers.txt`, `Disks.txt` and `EventLogs.txt`. Run it as administrator for complete SMART, driver and event-log data.
-
-Tools that make system changes (CHKDSK repair, registry, network resets, startup type changes and similar) show a confirmation first and need administrator rights.
+- Gives you one dashboard with a button for each common support task.
+- Runs checks and fixes (restart a service, clear a print queue, reset the network, repair system files) and shows the result in plain language.
+- Guides you through common problems with a **Troubleshooting Wizard** that runs the checks in order, explains each step, and asks before changing anything.
+- Collects information about a PC (hardware, network, drivers, disks, event logs) and saves it as a **diagnostic report** you can attach to a ticket.
+- Launches portable utilities you add yourself (disk health, hardware info, file search and so on) and vendor tools for printers and scanners.
+- Keeps a log of what was run on each computer.
 
 ## Getting started
 
 1. Copy the toolkit folder to a Windows PC or USB drive.
-2. Run `START.bat` to open the dashboard. The launcher offers to relaunch elevated only when a selected tool needs it.
-3. Alternatively, run `START-AsAdmin.bat` to start the dashboard with administrator rights.
-4. Select a category or search for a tool. Read any confirmation prompt before proceeding with a repair.
+2. Run `START.bat` to open the dashboard. When you click a tool that needs administrator rights, it offers to relaunch elevated.
+3. Or run `START-AsAdmin.bat` to start with administrator rights straight away.
+4. Pick a category on the left, then click a tool. Results appear in the output pane at the bottom.
 
-### Requirements
+**Requirements:** Windows 10 or 11 with the built-in Windows PowerShell 5.1. No internet is needed for most tools. Some output (for example Wi-Fi information) expects an English version of Windows.
 
-- Windows 10 or Windows 11
-- Built-in Windows PowerShell 5.1
-- Administrator rights for some repair and configuration actions
+## How it is organized
 
-Most built-in troubleshooting tools work offline. Vendor support pages and any external applications require their own network access or installation as applicable. Some output parsing (for example Wi-Fi information) expects English Windows labels.
+The sidebar is split into categories:
 
-## Project layout
+| Category | What you will find |
+|---|---|
+| Quick Fix | One-click fixes: restart Explorer, Windows Update, audio, Bluetooth, services, the PC; clear temp files. The Troubleshooting Wizard is at the top. |
+| Windows Issues | SFC and DISM repairs, component store cleanup, Windows Update repair, Disk Cleanup, version and build information, and shortcuts to built-in Windows tools |
+| Printer / Scanner Issues | Detect printers and scanners, check status, ports and drivers, clear the print queue, restart printer and scanner services, test pages, and vendor tools (HP, Canon, Epson, Brother, others) |
+| Network Issues | Network Center window, IP/MAC/Wi-Fi information with copy buttons, internet / gateway / DNS tests, and fixes such as flush DNS, renew IP, adapter restart and full network reset |
+| Services | Service Center window (search, start, stop, restart), status of common services, one-click restarts |
+| Hardware / Devices | Problem devices, connected devices, USB troubleshooting, drivers, audio, Bluetooth, display/GPU, storage |
+| Diagnostics | Computer Information window with Copy All, diagnostic report generator, system / network / printer / scanner checks, recent event-log errors, and the toolkit self-check |
+| Portable Tools | Launcher for portable programs stored in `PortableApps\` |
+| Advanced / Hardcore | CHKDSK, SMART data, registry editor, firewall diagnostics, local users, service configuration and dependencies, and the riskiest repairs |
+
+### Folder layout
 
 | Folder or file | Purpose |
 |---|---|
-| `START.bat`, `START-AsAdmin.bat` | Launch normally or with administrator rights |
-| `Launcher\` | Dashboard (`Toolkit.ps1`) and shared helpers (`Common.ps1`, `Part3-Helpers.ps1`, `Part4-Helpers.ps1`) |
-| `Config\` | Dashboard shortcuts (`shortcuts.json`) and toolkit settings (`settings.json`); `Config\backup\` holds automatic backups |
-| `QuickFix\`, `Printers\`, `Scanners\`, `Services\` | Part 1-2 support scripts |
-| `Network\`, `Windows\`, `Hardware\` | Part 3 support scripts |
-| `Diagnostics\`, `Advanced\`, `Wizard\` | Part 4 diagnostics, advanced tools and the Troubleshooting Wizard |
-| `PortableApps\` | Portable programs, one sub-folder per category (not shipped with the toolkit) |
-| `Manufacturer\` | Vendor utility folders and the vendor launcher |
+| `START.bat`, `START-AsAdmin.bat` | Start the toolkit normally or as administrator |
+| `Launcher\` | The dashboard and shared helper scripts |
+| `Config\` | `shortcuts.json` (the buttons) and `settings.json` (options); automatic backups are kept in `Config\backup\` |
+| `QuickFix\`, `Windows\`, `Printers\`, `Scanners\`, `Network\`, `Services\`, `Hardware\`, `Diagnostics\`, `Advanced\`, `Wizard\` | The scripts behind the buttons, grouped by topic |
+| `Manufacturer\` | Vendor utilities, one sub-folder per brand |
+| `PortableApps\` | Portable programs you download yourself, one sub-folder per category |
 | `Drivers\` | Optional place for driver installers |
-| `Reports\` | Generated diagnostic reports |
-| `Logs\` | Optional action logs, one file per computer |
+| `Reports\` | Diagnostic reports, one folder per computer and date |
+| `Logs\` | Action logs, one file per computer |
 
 ## How it works
 
-- `Launcher\Toolkit.ps1` builds the Windows Forms dashboard from `Config\shortcuts.json`.
-- Each PowerShell tool is a standalone script in its feature folder. Shortcut entries can also launch programs or Windows pages. Entries whose script file is missing are hidden automatically.
-- `Launcher\Common.ps1` provides shared functionality such as output formatting, logging, service restarts, and selection dialogs. `Part3-Helpers.ps1` and `Part4-Helpers.ps1` add network, hardware and report helpers.
-- Tools report results using `[ OK ]`, `[FAIL]`, `[WARN]`, and `[INFO]` messages.
+- `Launcher\Toolkit.ps1` draws the dashboard and reads `Config\shortcuts.json` to build the buttons. A button whose script file is missing is hidden automatically.
+- Each tool is its own PowerShell script. The dashboard runs it in a separate process and shows its output live.
+- Shared code (output formatting, logging, service restarts, selection dialogs, network and report helpers) lives in `Launcher\`.
+- Output lines start with a tag: `[ OK ]`, `[FAIL]`, `[WARN]` or `[INFO]`, shown in color.
 - Exit codes: 0 = success, 1 = failed, 2 = needs administrator.
-- When logging is enabled, actions are recorded in `Logs\<COMPUTERNAME>.log`. Logging can be toggled in the dashboard; `loggingEnabled` in `Config\settings.json` controls its default.
+- Button borders show what to expect: **blue** needs administrator rights, **red** asks for confirmation first. Hover over a button for a description.
+- Actions are logged to `Logs\COMPUTERNAME.log`. Tick or untick **Log actions** in the dashboard, or change `loggingEnabled` in `Config\settings.json`.
 
-## Portable Tools
+### The Troubleshooting Wizard
 
-The toolkit does **not** include third-party programs. Download the official portable version of each tool, unzip it into the matching `PortableApps\<category>` folder, and the Portable Tools buttons will list and launch it. `PortableApps\README.txt` lists the suggested tools and their official download pages. Check each tool's licence before copying it to a USB drive.
+Choose the closest problem (printer not printing, scanner not working, no internet, Wi-Fi, slow Windows, no sound, USB device, driver problem, or something else). The wizard runs read-only checks automatically, explains why each step matters, skips fixes that are not needed, asks before each fix, and finishes by asking whether the problem is solved. If it is not, it suggests next steps and offers to create a diagnostic report.
 
-## Adding a tool
+### Diagnostic report
 
-1. Add a PowerShell script to the relevant feature folder. For a tool using the shared helpers, start it with:
+**Diagnostics > Generate diagnostic report** creates `Reports\COMPUTERNAME_yyyy-MM-dd_HHmm\` with `System.txt`, `Network.txt`, `Printers.txt`, `Scanners.txt`, `Services.txt`, `Drivers.txt`, `Disks.txt` and `EventLogs.txt`. Run it as administrator for complete SMART, driver and event-log data.
+
+### Portable tools and vendor utilities
+
+The toolkit does not include third-party software. Download the official portable version of each tool and unzip it into the matching `PortableApps\<category>` folder; `PortableApps\README.txt` lists suggested tools and their official download pages. Put printer and scanner utilities from the manufacturer in `Manufacturer\<brand>`. Check each tool's licence before copying it to a USB drive.
+
+## Precautions
+
+This toolkit can change Windows services, networking, system files and device settings. Before using it:
+
+- **Get permission.** Only use it on computers you are authorized to support, and get approval from the owner before running repairs.
+- **Back up first** when a repair can affect data or the system (CHKDSK repair, Windows Update repair, resets). Read every confirmation prompt.
+- **Start with read-only tools.** The checks, diagnostics and information tools change nothing. Use fixes only when a check points to a problem.
+- **Be careful with the Advanced category.** The registry editor, CHKDSK /F and /R, startup type changes and network resets can stop Windows or the network from working. Network resets need a restart afterwards.
+- **Test before wider use.** Try the toolkit on a spare PC or VM, ideally with a deliberately created fault, before using it on other people's computers.
+- **Expect some security software to react.** PowerShell started with `-ExecutionPolicy Bypass` may be flagged. Check with whoever manages security on that PC.
+- **Protect the logs and reports.** They contain computer and user names. Decide who may see them, and keep `Logs\` and `Reports\` out of version control.
+- **Avoid running it on unattended machines** unless you are sure of what each tool does; some actions (restart, service stops) interrupt users.
+
+## Adding your own tool
+
+1. Add a script to the matching folder. Start it with:
 
    ```powershell
    . (Join-Path (Split-Path -Parent $PSScriptRoot) 'Launcher\Common.ps1')
    ```
 
-   Finish by reporting the outcome with `Complete-Action -Action 'Name' -Success $ok`.
+   and finish with `Complete-Action -Action 'Name' -Success $ok`.
 
-2. Add an entry to `Config\shortcuts.json`, for example:
+2. Add an entry to `Config\shortcuts.json`:
 
    ```json
    {
@@ -111,22 +110,7 @@ The toolkit does **not** include third-party programs. Download the official por
    }
    ```
 
-   Use a `"type": "run"` entry with `"path"` and `"args"` to open a program or Windows page, or `"type": "gui"` to launch a script that displays its own window.
+   - `"type": "run"` with `"path"` and `"args"` opens any program or Windows page (for example `services.msc`).
+   - `"type": "gui"` starts a script that shows its own window.
 
-3. Run **Diagnostics > Toolkit self-check** (syntax check and wiring check) to confirm the new script and button are valid.
-
-## Manufacturer utilities
-
-Place legitimate vendor utilities in `Manufacturer\HP`, `Manufacturer\Canon`, `Manufacturer\Epson`, `Manufacturer\Brother`, or `Manufacturer\Other`. Vendor support links are configurable in `Config\settings.json`. Printer maintenance features such as printhead cleaning and nozzle checks vary by model, so use the appropriate manufacturer's tool or driver.
-
-## Before using it on other computers
-
-- Test on a spare PC or VM first, ideally with deliberately created faults (stopped Print Spooler, stuck print job, wrong DNS) to confirm the fixes actually work.
-- Check how the tools behave in a standard (non-admin) user session.
-- Some security software may flag PowerShell launched with `-ExecutionPolicy Bypass`; test on one PC before wider use.
-- Logs and reports contain computer and user names. Decide who may see them, and avoid committing `Logs\` and `Reports\` to version control.
-- Get approval from whoever owns the computers before running repairs.
-
-## Use with care
-
-This toolkit can change Windows services, networking, system files, and device configuration. Review prompts, understand the selected operation, and make sure you have appropriate authorization and backups before applying repairs. The toolkit is intended for authorized IT support.
+3. Run **Diagnostics > Toolkit self-check** (syntax check and wiring check) to confirm the script and button are valid.
