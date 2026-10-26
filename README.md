@@ -13,6 +13,18 @@ A portable Windows troubleshooting dashboard for day-to-day IT support. It puts 
 - Launches portable utilities you add yourself (disk health, hardware info, file search and so on) and vendor tools for printers and scanners.
 - Keeps a log of what was run on each computer.
 
+## Quick install (one line)
+
+Open **PowerShell** and run:
+
+```powershell
+irm https://raw.githubusercontent.com/JLESC2026/IT-Tech-Support-Tool-Kit/main/Install.ps1 | iex
+```
+
+This downloads the toolkit to `%LOCALAPPDATA%\ITTechToolkit`, creates a desktop shortcut, asks for administrator rights and starts the dashboard. Run the same line again to update; your `Logs` and `Reports` are kept.
+
+Set `$env:ITTK_NOADMIN='1'` before the command to skip the automatic administrator prompt.
+
 ## Getting started
 
 1. Copy the toolkit folder to a Windows PC or USB drive.
@@ -42,6 +54,7 @@ The sidebar is split into categories:
 
 | Folder or file | Purpose |
 |---|---|
+| `Install.ps1` | Web installer used by the one-line command |
 | `START.bat`, `START-AsAdmin.bat` | Start the toolkit normally or as administrator |
 | `Launcher\` | The dashboard and shared helper scripts |
 | `Config\` | `shortcuts.json` (the buttons) and `settings.json` (options); automatic backups are kept in `Config\backup\` |
