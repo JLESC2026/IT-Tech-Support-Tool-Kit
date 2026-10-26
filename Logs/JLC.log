@@ -1,1 +1,40 @@
-﻿
+﻿2026-10-19 11:08
+Computer: JLC
+User: sneyp
+Action: Renew IP address (DHCP)
+Result: SUCCESS
+
+2026-10-19 11:09
+Computer: JLC
+User: sneyp
+Action: Detect printers
+Result: SUCCESS
+Detail: 3 printer(s)
+
+2026-10-19 11:09
+Computer: JLC
+User: sneyp
+Action: Printer diagnostics
+Result: SUCCESS
+Detail: 0 issue(s)
+
+2026-10-19 11:09
+Computer: JLC
+User: sneyp
+Action: Wizard: Printer isn't printing
+Result: RESOLVED
+Detail: OK        Is the printer detected?; OK        Printer diagnostics; SKIPPED   Clear the print queue (not needed); SKIPPED   Restart the Print Spooler (not needed); SKIPPED   Print a test page
+
+2026-10-19 11:09
+Computer: JLC
+User: sneyp
+Action: Wizard: Something else
+Result: STOPPED
+Detail: STOPPED   System diagnostics
+
+2026-10-21 15:07
+Computer: JLC
+User: IT
+Action: Renew IP address (DHCP)
+Result: SUCCESS
+

@@ -1,0 +1,13 @@
+# PortableApps: keep the folder structure (.keep files), ignore the programs inside.
+# README.txt and Portable-Launcher.ps1 sit directly in PortableApps\ so they are still tracked.
+PortableApps/*/*
+!PortableApps/*/.keep
+
+# Per-computer data: logs and reports contain computer/user names, so keep them out of the repo.
+Logs/*
+!Logs/.keep
+Reports/*
+!Reports/.keep
+
+# Local backups made by the merge scripts
+Config/backup/
