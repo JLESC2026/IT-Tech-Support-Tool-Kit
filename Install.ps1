@@ -11,7 +11,12 @@
 $Owner  = 'JLESC2026'
 $Repo   = 'IT-Tech-Support-Tool-Kit'
 $Branch = 'main'
-$InstallDir = Join-Path $env:LOCALAPPDATA 'ITTechToolkit'
+# $SelfDelete = $true : run from a temp folder and delete everything when the toolkit is closed.
+#                       Logs and Reports are copied to Documents\ITTechToolkit-Data first.
+# $SelfDelete = $false: install permanently to %LOCALAPPDATA%\ITTechToolkit (with a desktop shortcut).
+$SelfDelete = $true
+if ($SelfDelete) { $InstallDir = Join-Path $env:TEMP 'ITTechToolkit' }
+else { $InstallDir = Join-Path $env:LOCALAPPDATA 'ITTechToolkit' }
 # Set $env:ITTK_NOADMIN = '1' before running to skip the automatic admin relaunch.
 # ------------------------------------------------------------
 
@@ -73,8 +78,8 @@ try {
 
     Get-ChildItem -LiteralPath $InstallDir -Recurse -File -ErrorAction SilentlyContinue | Unblock-File -ErrorAction SilentlyContinue
 
-    # Desktop shortcut (created once)
-    try {
+    # Desktop shortcut (created once, only for a permanent install)
+    if (-not $SelfDelete) { try {
         $lnk = Join-Path ([Environment]::GetFolderPath('Desktop')) 'IT Technician Toolkit.lnk'
         if (-not (Test-Path $lnk)) {
             $ws = New-Object -ComObject WScript.Shell
@@ -84,13 +89,42 @@ try {
             $s.Save()
             Write-Step 'Desktop shortcut created.'
         }
-    } catch { }
+    } catch { } }
 
     Write-Step 'Starting the toolkit...'
     $ps = Join-Path $PSHOME 'powershell.exe'
-    Start-Process -FilePath $ps -WorkingDirectory $InstallDir `
-        -ArgumentList "-NoProfile -ExecutionPolicy Bypass -STA -WindowStyle Hidden -File `"$(Join-Path $InstallDir 'Launcher\Toolkit.ps1')`""
-    Write-Step 'Done. You can close this window.'
+    $tk = Join-Path $InstallDir 'Launcher\Toolkit.ps1'
+    $argList = "-NoProfile -ExecutionPolicy Bypass -STA -WindowStyle Hidden -File `"$tk`""
+    if ($SelfDelete) {
+        Write-Step 'Toolkit is running. Keep this window open; it cleans up when you close the toolkit.'
+        Start-Process -FilePath $ps -WorkingDirectory $InstallDir -ArgumentList $argList -Wait
+
+        # The toolkit can relaunch itself as admin: wait until no copy of it is still running
+        for ($i = 0; $i -lt 900; $i++) {
+            $left = @(Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" -ErrorAction SilentlyContinue |
+                Where-Object { $_.CommandLine -and $_.CommandLine.Contains($InstallDir) })
+            if ($left.Count -eq 0) { break }
+            Start-Sleep -Seconds 2
+        }
+
+        Write-Step 'Toolkit closed - cleaning up...'
+        $keep = Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'ITTechToolkit-Data'
+        foreach ($d in 'Logs', 'Reports') {
+            $p = Join-Path $InstallDir $d
+            if ((Test-Path $p) -and @(Get-ChildItem -LiteralPath $p -Recurse -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -ne '.keep' }).Count -gt 0) {
+                $dest = Join-Path $keep $d
+                if (-not (Test-Path $dest)) { New-Item -ItemType Directory -Path $dest -Force | Out-Null }
+                Copy-Item -Path (Join-Path $p '*') -Destination $dest -Recurse -Force -ErrorAction SilentlyContinue
+                Write-Step "Saved $d to $dest"
+            }
+        }
+        Set-Location $env:TEMP
+        Remove-Item -LiteralPath $InstallDir -Recurse -Force -ErrorAction SilentlyContinue
+        Write-Step 'Toolkit removed from this PC. Done.'
+    } else {
+        Start-Process -FilePath $ps -WorkingDirectory $InstallDir -ArgumentList $argList
+        Write-Step 'Done. You can close this window.'
+    }
 } catch {
     Write-Host "[ITTK] Install failed: $($_.Exception.Message)" -ForegroundColor Red
 } finally {
