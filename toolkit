@@ -1,0 +1,124 @@
+# IT Technician Toolkit - Short Link Launcher (zero-trace mode)
+# Nothing is kept on the PC after the toolkit window is closed: no Desktop files, no AppData files,
+# no saved logs or reports, and this session's command history is not written to disk either.
+#
+# Recommended command (works on Windows PowerShell 5.1 and 7, any TLS default):
+#   [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; $r=(iwr -UseBasicParsing https://jlesc2026.github.io/toolkit).Content; if($r -is [byte[]]){$r=[Text.Encoding]::UTF8.GetString($r)}; iex $r.TrimStart([char]0xFEFF)
+# Short form (only works if the host serves this file as text): irm jlesc2026.github.io/toolkit | iex
+
+$PayloadOwner  = 'JLESC2026'
+$PayloadRepo   = 'IT-Tech-Support-Tool-Kit'
+$PayloadBranch = 'main'
+
+$ErrorActionPreference = 'Stop'
+try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch { }
+$ProgressPreference = 'SilentlyContinue'
+
+$installerSelfUrl = 'https://jlesc2026.github.io/toolkit'
+$zipUrl           = "https://github.com/$PayloadOwner/$PayloadRepo/archive/refs/heads/$PayloadBranch.zip"
+
+# Everything lives under here while running, and the whole folder is deleted at the end.
+# Not the Desktop, not AppData/LocalAppData, not the user profile. Hidden + admin-only while it exists.
+$vaultRoot = Join-Path $env:ProgramData 'ITTK'
+
+function Write-Step { param([string]$m) Write-Host "[ITTK] $m" -ForegroundColor Cyan }
+function Stop-Pause { param([string]$m) Write-Host "[ITTK] $m" -ForegroundColor Yellow; Read-Host 'Press Enter to close' | Out-Null }
+
+function Protect-Folder {
+    param([string]$Path)
+    if (-not (Test-Path -LiteralPath $Path)) { New-Item -ItemType Directory -Path $Path -Force | Out-Null }
+    & icacls.exe $Path /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' | Out-Null
+    & attrib.exe +h +s $Path | Out-Null
+}
+
+# Don't let this session's commands land in PSReadLine's on-disk history file.
+try {
+    Set-PSReadLineOption -HistorySaveStyle SaveNothing -ErrorAction Stop
+} catch { }
+
+if ($env:OS -ne 'Windows_NT') {
+    Write-Host '[ITTK] This toolkit runs on Windows only.' -ForegroundColor Red
+    return
+}
+
+# ---------- Elevate (required for IT repair tools) ----------
+$id = [Security.Principal.WindowsIdentity]::GetCurrent()
+$isAdmin = (New-Object Security.Principal.WindowsPrincipal($id)).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+if (-not $isAdmin -and $env:ITTK_NOADMIN -ne '1') {
+    Write-Step 'Requesting administrator elevation...'
+    try {
+        # Encoded command: no quoting problems, TLS 1.2 set before download, handles byte[] responses,
+        # and an encoded command is also not written to PSReadLine history by the parent shell.
+        $boot = "[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; " +
+                "`$r=(Invoke-WebRequest -UseBasicParsing '$installerSelfUrl').Content; " +
+                "if(`$r -is [byte[]]){`$r=[Text.Encoding]::UTF8.GetString(`$r)}; " +
+                "Invoke-Expression `$r.TrimStart([char]0xFEFF)"
+        $enc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($boot))
+        $psExe = (Get-Process -Id $PID).Path
+        Start-Process -FilePath $psExe -Verb RunAs -ArgumentList "-NoProfile -ExecutionPolicy Bypass -EncodedCommand $enc"
+        return
+    } catch {
+        Stop-Pause 'Elevation cancelled or blocked.'
+        return
+    }
+}
+
+$tmp = $null
+try {
+    Protect-Folder $vaultRoot
+
+    # Remove leftovers from any earlier crashed session before starting
+    Get-ChildItem -LiteralPath $vaultRoot -Directory -Filter 'run_*' -ErrorAction SilentlyContinue |
+        ForEach-Object { Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction SilentlyContinue }
+
+    $tmp = Join-Path $vaultRoot ('run_' + [guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $tmp -Force | Out-Null
+    $zip = Join-Path $tmp 'toolkit.zip'
+
+    Write-Step "Downloading toolkit from $PayloadRepo..."
+    try {
+        Invoke-WebRequest -Uri $zipUrl -OutFile $zip -UseBasicParsing
+    } catch {
+        throw "Download failed ($($_.Exception.Message)). If this says 404, the GitHub repo is private - it must be public for this link to work. Otherwise check internet/proxy/firewall access to github.com."
+    }
+
+    Write-Step 'Extracting...'
+    $extract = Join-Path $tmp 'x'
+    Expand-Archive -LiteralPath $zip -DestinationPath $extract -Force
+
+    $src = Get-ChildItem -LiteralPath $extract -Directory | Select-Object -First 1
+    # The toolkit may sit at the repo root or inside a subfolder (e.g. 'Technical Support'), so search for it.
+    $found = Get-ChildItem -LiteralPath $src.FullName -Recurse -File -Filter 'Toolkit.ps1' -ErrorAction SilentlyContinue |
+        Where-Object { (Split-Path $_.DirectoryName -Leaf) -eq 'Launcher' } | Select-Object -First 1
+    if (-not $found) { throw 'Toolkit launcher not found in download package.' }
+    $toolkitScript = $found.FullName
+
+    Get-ChildItem -LiteralPath $src.FullName -Recurse -File -ErrorAction SilentlyContinue | Unblock-File -ErrorAction SilentlyContinue
+
+    # Logging to disk is switched off for this run - nothing in Logs\ or Reports\ survives the session.
+    $env:TOOLKIT_LOG = '0'
+
+    Write-Step 'Launching toolkit... (keep this window open during the support session)'
+    $ps = (Get-Process -Id $PID).Path
+    Start-Process -FilePath $ps -WorkingDirectory (Split-Path $toolkitScript) `
+        -ArgumentList "-NoProfile -ExecutionPolicy Bypass -STA -File `"$toolkitScript`"" -Wait
+
+    Write-Step 'Toolkit session ended.'
+} catch {
+    Stop-Pause "Error: $($_.Exception.Message)"
+} finally {
+    if ($tmp -and (Test-Path -LiteralPath $tmp)) {
+        # Clear read-only/hidden/system flags recursively so Remove-Item can delete everything, then wipe it.
+        try {
+            Get-ChildItem -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue |
+                ForEach-Object { $_.Attributes = 'Normal' }
+        } catch { }
+        Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    # Remove the parent vault folder too if nothing else is using it (e.g. a concurrent session).
+    if ((Test-Path -LiteralPath $vaultRoot) -and -not (Get-ChildItem -LiteralPath $vaultRoot -Force -ErrorAction SilentlyContinue)) {
+        try { & attrib.exe -h -s $vaultRoot | Out-Null } catch { }
+        Remove-Item -LiteralPath $vaultRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    Write-Step 'Cleanup complete. No toolkit files remain on this computer.'
+}

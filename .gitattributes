@@ -1,2 +1,16 @@
-# Auto detect text files and perform LF normalization
 * text=auto
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.json text eol=lf
+*.md text eol=lf
+toolkit text eol=lf
+assess text eol=lf
+# Never touch binaries (portable apps)
+*.exe binary
+*.dll binary
+*.zip binary
+*.7z binary
+*.msi binary
+*.ico binary
+*.png binary
