@@ -1,4 +1,4 @@
-# Repo root. Portable apps under "Technical Support/PortableApps" are tracked (see that folder's .gitignore).
+# Runtime output
 Technical Support/Logs/*
 !Technical Support/Logs/.keep
 Technical Support/Reports/*
@@ -6,6 +6,12 @@ Technical Support/Reports/*
 Technical Support/Config/backup/
 Assess/Reports/*
 !Assess/Reports/.keep
+
+# Bundled portable applications are large runtime payloads, not source.
+Technical Support/PortableApps/*/**
+!Technical Support/PortableApps/*/**/
+!Technical Support/PortableApps/*/**/.keep
+
 Thumbs.db
 desktop.ini
 *.tmp
