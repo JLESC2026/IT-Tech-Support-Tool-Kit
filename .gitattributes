@@ -5,7 +5,7 @@
 *.json text eol=lf
 *.md text eol=lf
 toolkit text eol=lf
-assess text eol=lf
+ShortLinks/assess text eol=lf
 # Never touch binaries (portable apps)
 *.exe binary
 *.dll binary
