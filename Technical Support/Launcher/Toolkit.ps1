@@ -21,7 +21,10 @@ try {
 
     # Child scripts inherit these
     $env:TOOLKIT_LAUNCHER = '1'
-    $env:TOOLKIT_LOG = $(if ($script:Settings.loggingEnabled) { '1' } else { '0' })
+    # A launcher that sets TOOLKIT_LOG explicitly (the short-link launcher sets 0) wins over settings.json.
+    if ($env:TOOLKIT_LOG -ne '0' -and $env:TOOLKIT_LOG -ne '1') {
+        $env:TOOLKIT_LOG = $(if ($script:Settings.loggingEnabled) { '1' } else { '0' })
+    }
 
     # ---------- Colours / fonts ----------
     $cDark    = [System.Drawing.Color]::FromArgb(17, 24, 39)
@@ -95,7 +98,7 @@ try {
     $chkLog.Text = 'Log actions'
     $chkLog.ForeColor = [System.Drawing.Color]::White
     $chkLog.AutoSize = $true
-    $chkLog.Checked = [bool]$script:Settings.loggingEnabled
+    $chkLog.Checked = ($env:TOOLKIT_LOG -eq '1')
     $chkLog.Margin = New-Object System.Windows.Forms.Padding(8, 4, 8, 0)
     $script:status = New-Object System.Windows.Forms.Label
     $status.ForeColor = [System.Drawing.Color]::FromArgb(156, 163, 175)

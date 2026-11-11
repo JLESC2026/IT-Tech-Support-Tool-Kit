@@ -1,0 +1,98 @@
+name: Release
+
+# Publishing a release is what makes a new version reachable from the short links:
+#   1. builds toolkit-<version>.zip and Assess-<version>.ps1 from the tagged commit,
+#   2. computes their SHA-256 hashes and attaches both files to a GitHub release,
+#   3. writes manifest.json and version.json and copies the launchers (toolkit, ShortLinks/assess, install)
+#      into the Pages repository, so the launchers and the manifest they verify always match.
+#
+# Start it by pushing a tag:   git tag v1.0.0 && git push origin v1.0.0
+# Roll back by running this workflow manually (Actions > Release > Run workflow) with an OLDER tag.
+#
+# One-time setup for step 3: create a fine-grained personal access token limited to the
+# JLESC2026/JLESC2026.github.io repository with "Contents: Read and write", and save it in this repository as the
+# secret PAGES_DEPLOY_TOKEN. Without the secret, steps 1 and 2 still run and step 3 is skipped with a warning.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to (re)publish, for example v1.0.0'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+      PAGES_TOKEN: ${{ secrets.PAGES_DEPLOY_TOKEN }}
+      GH_TOKEN: ${{ github.token }}
+      REPO_URL: https://github.com/JLESC2026/IT-Tech-Support-Tool-Kit
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref_name }}
+          fetch-depth: 0
+
+      - name: Build release files and manifest
+        run: |
+          set -euo pipefail
+          VER="${TAG#v}"
+          mkdir dist
+          git archive --format=zip --prefix="IT-Tech-Support-Tool-Kit-${VER}/" -o "dist/toolkit-${VER}.zip" "$TAG"
+          cp Assess/Assess.ps1 "dist/Assess-${VER}.ps1"
+          ZSHA=$(sha256sum "dist/toolkit-${VER}.zip" | cut -d' ' -f1)
+          ASHA=$(sha256sum "dist/Assess-${VER}.ps1" | cut -d' ' -f1)
+          NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          jq -n --arg v "$VER" --arg tag "$TAG" --arg now "$NOW" \
+            --arg zurl "$REPO_URL/releases/download/$TAG/toolkit-${VER}.zip" --arg zsha "$ZSHA" \
+            --arg aurl "$REPO_URL/releases/download/$TAG/Assess-${VER}.ps1" --arg asha "$ASHA" \
+            '{schema:1, version:$v, tag:$tag, released:$now,
+              toolkit:{url:$zurl, sha256:$zsha},
+              assess:{url:$aurl, sha256:$asha}}' > manifest.json
+          jq -n --arg v "$VER" --arg tag "$TAG" --arg now "$NOW" --arg repo "$REPO_URL" \
+            '{version:$v, tag:$tag, released:$now, repository:$repo}' > version.json
+          cat manifest.json
+
+      - name: Create or update the GitHub release
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --clobber
+          else
+            gh release create "$TAG" dist/* --title "$TAG" --generate-notes
+          fi
+
+      - name: Check out the Pages repository
+        if: env.PAGES_TOKEN != ''
+        uses: actions/checkout@v4
+        with:
+          repository: JLESC2026/JLESC2026.github.io
+          token: ${{ secrets.PAGES_DEPLOY_TOKEN }}
+          path: pages
+
+      - name: Publish launchers and manifest to the Pages repository
+        if: env.PAGES_TOKEN != ''
+        run: |
+          set -euo pipefail
+          cp toolkit pages/toolkit
+          cp ShortLinks/assess pages/assess
+          sed 's/\r$//' Install.ps1 > pages/install
+          cp manifest.json version.json pages/
+          cd pages
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          if git diff --cached --quiet; then echo 'Pages repository already up to date.'; else
+            git commit -m "Publish $TAG (launchers, manifest.json, version.json)"
+            git push
+          fi
+
+      - name: Warn when the Pages repository was not updated
+        if: env.PAGES_TOKEN == ''
+        run: echo "::warning::PAGES_DEPLOY_TOKEN is not set - the release was created but manifest.json and the launchers were NOT published to the Pages repository."

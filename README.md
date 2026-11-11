@@ -1,17 +1,45 @@
 # IT Tech Support Tool Kit
 
-| Folder | What it is |
+| Folder / file | What it is |
 |---|---|
 | `Technical Support/` | Diagnose-and-fix dashboard (`Launcher\Toolkit.ps1`) with portable apps |
 | `Assess/` | Separate read-only full-PC assessment -> single HTML report |
-| `toolkit`, `Short Links/assess` | Short-link loaders; copy both into the `JLESC2026.github.io` repo |
+| `toolkit`, `ShortLinks/assess`, `Install.ps1` | Launcher source files. The **Release** workflow (`.github/workflows/release.yml`) publishes them to the `JLESC2026.github.io` site as `toolkit`, `assess` and `install`. The assessment launcher is kept outside the root because the root already contains the `Assess/` folder; Windows does not allow both `Assess` and `assess` there. |
+
+## Two ways to run it
+
+| Mode | How | Portable apps | What is left on the PC |
+|---|---|---|---|
+| **Online, no copy kept** | The `toolkit` command below, typed in PowerShell | None (none are downloaded) | A temporary protected folder under `C:\ProgramData`, deleted when you close the toolkit. See [Minimal footprint](#minimal-footprint) |
+| **Flash-drive copy** | Build it once with the `install` command below, then run `START.bat` from the drive | Yes. You add your own to `PortableApps\` on the drive | Files stay on the drive. Windows' own records are not affected |
+
+These are the commands recommended in the launchers' own headers. They set TLS 1.2 and handle a download that arrives as bytes, which the short form `irm jlesc2026.github.io/toolkit | iex` does not (the short form only works if the host serves the file as text).
 
 ```powershell
-irm jlesc2026.github.io/toolkit | iex     # zero-trace support dashboard
-irm jlesc2026.github.io/assess  | iex     # hardware assessment report on the Desktop
-irm "https://raw.githubusercontent.com/JLESC2026/IT-Tech-Support-Tool-Kit/main/Install.ps1" | iex   # keep a copy on the PC
+# Online run of the support dashboard (asks for administrator rights)
+[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; $r=(iwr -UseBasicParsing https://jlesc2026.github.io/toolkit).Content; if($r -is [byte[]]){$r=[Text.Encoding]::UTF8.GetString($r)}; iex $r.TrimStart([char]0xFEFF)
+
+# Online run of the read-only PC assessment (report is saved to the Desktop)
+[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; $r=(iwr -UseBasicParsing https://jlesc2026.github.io/assess).Content; if($r -is [byte[]]){$r=[Text.Encoding]::UTF8.GetString($r)}; iex $r.TrimStart([char]0xFEFF)
+
+# Build or update the flash-drive copy (no administrator rights needed)
+[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; $r=(iwr -UseBasicParsing https://jlesc2026.github.io/install).Content; if($r -is [byte[]]){$r=[Text.Encoding]::UTF8.GetString($r)}; iex $r.TrimStart([char]0xFEFF)
 ```
+
 The repository must be public for these links to work.
+
+### Verified releases
+
+The launchers never run whatever happens to be on the `main` branch. Each one reads `manifest.json` from the website, downloads the matching **release** file from GitHub Releases, and checks its SHA-256 hash before running or copying anything. If the hash does not match, or the manifest is missing or points anywhere other than this repository's releases, **nothing runs**. A new version only reaches the short links when a release is published (see `.github/workflows/release.yml`).
+
+### Minimal footprint
+
+The online mode runs from a temporary protected folder and deletes it on exit. It does not promise "zero trace", because Windows keeps its own records that a file wipe cannot remove.
+
+- **It does:** download a verified release into a new, randomly named folder under `C:\ProgramData` (hidden, administrators and SYSTEM only, links refused), switch the toolkit's disk logging off, delete the folder when you close the toolkit, and then **check** that it is gone and tell you if anything remains.
+- **It does not affect:** the command you typed (it may already be saved in your shell history), Windows event logs, PowerShell or process-creation logging if a policy enables it, antivirus or EDR history, Prefetch, UserAssist, the DNS cache, or UAC prompts.
+- **Reports made during the session are deleted with the folder.** Copy out anything you need (for example from Diagnostics > Computer Information) before you close the toolkit.
+- **The assessment is different:** its HTML report is saved to the Desktop and is kept. It contains the computer name, user name, serial number and MAC addresses.
 
 
 
@@ -48,21 +76,17 @@ A portable Windows troubleshooting dashboard for day-to-day IT support. It puts 
 - Launches portable utilities you add yourself (disk health, hardware info, file search and so on) and vendor tools for printers and scanners.
 - Keeps a log of what was run on each computer.
 
-## Quick install (one line)
+## Building the flash-drive copy
 
-Open **PowerShell** and run:
+Plug in the drive, open **PowerShell** and run the `install` command from [Two ways to run it](#two-ways-to-run-it). It lists removable drives, asks where to install and for confirmation, downloads and verifies the release, and creates `IT-Toolkit\` on the drive (the dashboard, plus the `Assess\` assessment). Run it again to update: your `PortableApps\`, `Logs\`, `Reports\` and `Config\settings.json` are kept, and the old configuration is saved under `Config\backup\`.
 
-```powershell
-irm https://raw.githubusercontent.com/JLESC2026/IT-Tech-Support-Tool-Kit/main/Install.ps1 | iex
-```
+To skip the prompts, set the target first, for example `$env:ITTK_TARGET = 'E:\'`.
 
-This downloads the toolkit to `%LOCALAPPDATA%\ITTechToolkit`, creates a desktop shortcut, asks for administrator rights and starts the dashboard. Run the same line again to update; your `Logs` and `Reports` are kept.
-
-Set `$env:ITTK_NOADMIN='1'` before the command to skip the automatic administrator prompt.
+Set `$env:ITTK_NOADMIN='1'` before the **online** `toolkit` command to skip its automatic administrator prompt. Use it only if you must: the toolkit's "Relaunch as admin" button would then run files from a folder your non-elevated session can also change.
 
 ## Getting started
 
-1. Copy the toolkit folder to a Windows PC or USB drive.
+1. Build the flash-drive copy (above), or copy the toolkit folder to a Windows PC. Or use the online mode and skip this step.
 2. Run `START.bat` to open the dashboard. When you click a tool that needs administrator rights, it offers to relaunch elevated.
 3. Or run `START-AsAdmin.bat` to start with administrator rights straight away.
 4. Pick a category on the left, then click a tool. Results appear in the output pane at the bottom.
@@ -89,8 +113,7 @@ The sidebar is split into categories:
 
 | Folder or file | Purpose |
 |---|---|
-| `Install.ps1` | Web installer used by the one-line command |
-| `START.bat`, `START-AsAdmin.bat` | Start the toolkit normally or as administrator |
+| `START.bat`, `START-AsAdmin.bat` | Start the toolkit normally or as administrator (included in the flash-drive copy; the repository's launchers `toolkit`, `ShortLinks\assess` and `Install.ps1` sit one level up) |
 | `Launcher\` | The dashboard and shared helper scripts |
 | `Config\` | `shortcuts.json` (the buttons) and `settings.json` (options); automatic backups are kept in `Config\backup\` |
 | `QuickFix\`, `Windows\`, `Printers\`, `Scanners\`, `Network\`, `Services\`, `Hardware\`, `Diagnostics\`, `Advanced\`, `Wizard\` | The scripts behind the buttons, grouped by topic |
@@ -108,7 +131,7 @@ The sidebar is split into categories:
 - Output lines start with a tag: `[ OK ]`, `[FAIL]`, `[WARN]` or `[INFO]`, shown in color.
 - Exit codes: 0 = success, 1 = failed, 2 = needs administrator.
 - Button borders show what to expect: **blue** needs administrator rights, **red** asks for confirmation first. Hover over a button for a description.
-- Actions are logged to `Logs\COMPUTERNAME.log`. Tick or untick **Log actions** in the dashboard, or change `loggingEnabled` in `Config\settings.json`.
+- Actions are logged to `Logs\COMPUTERNAME.log`. Tick or untick **Log actions** in the dashboard, or change `loggingEnabled` in `Config\settings.json`. The online `toolkit` mode starts with logging switched off (the launcher's setting wins over `settings.json`).
 
 ### The Troubleshooting Wizard
 
@@ -131,7 +154,7 @@ This toolkit can change Windows services, networking, system files and device se
 - **Start with read-only tools.** The checks, diagnostics and information tools change nothing. Use fixes only when a check points to a problem.
 - **Be careful with the Advanced category.** The registry editor, CHKDSK /F and /R, startup type changes and network resets can stop Windows or the network from working. Network resets need a restart afterwards.
 - **Test before wider use.** Try the toolkit on a spare PC or VM, ideally with a deliberately created fault, before using it on other people's computers.
-- **Expect some security software to react.** PowerShell started with `-ExecutionPolicy Bypass` may be flagged. Check with whoever manages security on that PC.
+- **Expect some security software to react.** The launchers and `START.bat` start PowerShell with `-ExecutionPolicy Bypass`, and the online mode downloads and runs a script with administrator rights, which endpoint security may flag or block. Check with whoever manages security on that PC before using it there.
 - **Protect the logs and reports.** They contain computer and user names. Decide who may see them, and keep `Logs\` and `Reports\` out of version control.
 - **Avoid running it on unattended machines** unless you are sure of what each tool does; some actions (restart, service stops) interrupt users.
 
@@ -162,3 +185,11 @@ This toolkit can change Windows services, networking, system files and device se
    - `"type": "gui"` starts a script that shows its own window.
 
 3. Run **Diagnostics > Toolkit self-check** (syntax check and wiring check) to confirm the script and button are valid.
+
+## Security, license and responsible use
+
+- **Use it only on computers you are authorized to support.** The tools can change services, networking, system files and devices.
+- **No warranty.** The toolkit is provided as is. Test it on a spare PC or virtual machine first.
+- **License:** not yet specified. Until a license file is added, contact the repository owner before redistributing or reusing the code.
+- **Found a security problem?** See [SECURITY.md](SECURITY.md).
+- **Third-party tools** are never bundled here. You download portable apps from their official sites and check each licence yourself.

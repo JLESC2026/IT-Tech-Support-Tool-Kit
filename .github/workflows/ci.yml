@@ -1,0 +1,77 @@
+name: CI
+
+# Runs on every push and pull request. Everything here is read-only: it parses and checks the scripts,
+# it never runs a repair tool.
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: windows-latest
+    env:
+      # Keeps the toolkit's own self-check scripts from waiting for a key press or writing log files.
+      TOOLKIT_LAUNCHER: '1'
+      TOOLKIT_LOG: '0'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Parse every script with Windows PowerShell 5.1
+        shell: powershell
+        run: |
+          $files = @(Get-ChildItem -Recurse -File -Filter '*.ps1' | Where-Object { $_.FullName -notmatch '\\\.git\\' })
+          $files += @(Get-Item -LiteralPath 'toolkit', 'ShortLinks\assess')
+          $bad = 0
+          foreach ($f in $files) {
+            $tokens = $null; $errs = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile($f.FullName, [ref]$tokens, [ref]$errs)
+            foreach ($e in @($errs)) {
+              Write-Host "::error file=$($f.FullName),line=$($e.Extent.StartLineNumber)::$($e.Message)"
+              $bad++
+            }
+          }
+          Write-Host "$($files.Count) file(s) parsed, $bad error(s)"
+          if ($bad -gt 0) { exit 1 }
+
+      - name: Toolkit syntax check (existing self-check)
+        shell: powershell
+        run: |
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'Technical Support\Diagnostics\Check-Syntax.ps1'
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: Toolkit wiring check (existing self-check)
+        shell: powershell
+        run: |
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'Technical Support\Diagnostics\Check-Wiring.ps1'
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: Launchers must stay pinned and hash-checked
+        shell: powershell
+        run: |
+          $problems = 0
+          foreach ($f in 'toolkit', 'ShortLinks\assess', 'Install.ps1') {
+            $t = Get-Content -LiteralPath $f -Raw
+            if ($t -match 'refs/heads/' -or $t -match 'raw\.githubusercontent\.com/[^\s''"]+/(main|master)/') {
+              Write-Host "::error file=$f::Downloads an unpinned branch. Launchers must use the release manifest."
+              $problems++
+            }
+            if ($t -notmatch 'manifest\.json' -or $t -notmatch 'Get-FileHash') {
+              Write-Host "::error file=$f::Missing the manifest or SHA-256 verification."
+              $problems++
+            }
+          }
+          if ($problems -gt 0) { exit 1 }
+          Write-Host 'Launchers are pinned and verified.'
+
+      - name: PSScriptAnalyzer (informational)
+        shell: powershell
+        # Reports findings but does not fail the build yet. Switch continue-on-error off once the list is clean.
+        continue-on-error: true
+        run: |
+          Install-Module PSScriptAnalyzer -Force -Scope CurrentUser -Repository PSGallery
+          Invoke-ScriptAnalyzer -Path . -Recurse -Severity Error, Warning |
+            Format-Table -AutoSize RuleName, Severity, ScriptName, Line, Message | Out-String -Width 220

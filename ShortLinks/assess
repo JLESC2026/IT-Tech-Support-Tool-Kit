@@ -1,0 +1,91 @@
+# PC Assessment - Short Link Launcher
+# The source lives under ShortLinks\ because Windows cannot have both an Assess folder and
+# a case-insensitive "assess" file in the repository root. The release workflow publishes
+# this file as /assess in the JLESC2026.github.io repository.
+#
+# Run: irm jlesc2026.github.io/assess | iex
+# The assessment is downloaded from a published release and SHA-256 checked before it runs.
+
+$PayloadOwner = 'JLESC2026'
+$PayloadRepo  = 'IT-Tech-Support-Tool-Kit'
+
+$ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
+try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch { }
+
+if ($env:OS -ne 'Windows_NT') {
+    Write-Host '[ASSESS] This assessment runs on Windows only.' -ForegroundColor Red
+    return
+}
+
+$manifestUrl = 'https://jlesc2026.github.io/manifest.json'
+$releasePrefix = "https://github.com/$PayloadOwner/$PayloadRepo/releases/download/"
+$tempRoot = Join-Path $env:TEMP ('assess_' + [guid]::NewGuid().ToString('N'))
+
+try {
+    New-Item -ItemType Directory -Path $tempRoot | Out-Null
+    $assessmentScript = Join-Path $tempRoot 'Assess.ps1'
+
+    Write-Host '[ASSESS] Checking the published release...' -ForegroundColor Cyan
+    $response = Invoke-WebRequest -Uri $manifestUrl -UseBasicParsing
+    $manifestText = $response.Content
+    if ($manifestText -is [byte[]]) { $manifestText = [Text.Encoding]::UTF8.GetString($manifestText) }
+    $manifest = ([string]$manifestText).TrimStart([char]0xFEFF) | ConvertFrom-Json
+
+    if ([int]$manifest.schema -ne 1 -or -not $manifest.assess -or -not $manifest.assess.url -or -not $manifest.assess.sha256) {
+        throw 'The release manifest is not in the expected format.'
+    }
+
+    $scriptUrl = [string]$manifest.assess.url
+    if (-not $scriptUrl.StartsWith($releasePrefix, [StringComparison]::Ordinal)) {
+        throw "The manifest points outside the approved release repository: $scriptUrl"
+    }
+    $expectedHash = ([string]$manifest.assess.sha256).Trim().ToLowerInvariant()
+    if ($expectedHash -notmatch '^[0-9a-f]{64}$') {
+        throw 'The manifest does not contain a valid SHA-256 value.'
+    }
+
+    Write-Host "[ASSESS] Downloading assessment $($manifest.version)..." -ForegroundColor Cyan
+    Invoke-WebRequest -Uri $scriptUrl -OutFile $assessmentScript -UseBasicParsing
+    if (-not (Test-Path -LiteralPath $assessmentScript) -or (Get-Item -LiteralPath $assessmentScript).Length -eq 0) {
+        throw 'The downloaded assessment script is empty.'
+    }
+    $actualHash = (Get-FileHash -LiteralPath $assessmentScript -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($actualHash -ne $expectedHash) {
+        throw 'The assessment SHA-256 does not match the published manifest. Nothing was run.'
+    }
+
+    $desktop = [Environment]::GetFolderPath('Desktop')
+    if (-not $desktop) { $desktop = $env:TEMP }
+    $arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$assessmentScript`" -OutDir `"$desktop`" -Pause"
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $isAdmin = (New-Object Security.Principal.WindowsPrincipal($identity)).IsInRole(
+        [Security.Principal.WindowsBuiltInRole]::Administrator
+    )
+
+    Write-Host '[ASSESS] Starting read-only assessment...' -ForegroundColor Cyan
+    $startParams = @{
+        FilePath = (Get-Process -Id $PID).Path
+        ArgumentList = $arguments
+        Wait = $true
+        PassThru = $true
+    }
+    if (-not $isAdmin) { $startParams.Verb = 'RunAs' }
+    $process = Start-Process @startParams
+    if ($process.ExitCode -ne 0) {
+        throw "Assessment process exited with code $($process.ExitCode)."
+    }
+} catch {
+    Write-Host "[ASSESS] Error: $($_.Exception.Message)" -ForegroundColor Red
+} finally {
+    if (Test-Path -LiteralPath $tempRoot) {
+        try {
+            Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction Stop
+            if (Test-Path -LiteralPath $tempRoot) {
+                Write-Host "[ASSESS] Warning: temporary files remain at $tempRoot" -ForegroundColor Yellow
+            }
+        } catch {
+            Write-Host "[ASSESS] Warning: could not remove temporary files at $tempRoot : $($_.Exception.Message)" -ForegroundColor Yellow
+        }
+    }
+}

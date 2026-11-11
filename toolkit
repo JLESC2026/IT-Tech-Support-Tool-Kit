@@ -1,6 +1,12 @@
-# IT Technician Toolkit - Short Link Launcher (zero-trace mode)
-# Nothing is kept on the PC after the toolkit window is closed: no Desktop files, no AppData files,
-# no saved logs or reports, and this session's command history is not written to disk either.
+# IT Technician Toolkit - Short Link Launcher (minimal-footprint mode)
+# Runs from a temporary protected folder and deletes it when the toolkit closes.
+# Windows and security-software records are NOT affected: event logs, PowerShell / process-creation
+# logging, antivirus or EDR history, Prefetch, the DNS cache and UAC prompts stay as they are, and the
+# command you typed may already be saved in your shell history. Logs and reports made during the
+# session are deleted with the folder, so copy out anything you need before closing the toolkit.
+#
+# Integrity: the toolkit is downloaded as a published release and its SHA-256 hash is checked against
+# https://jlesc2026.github.io/manifest.json before anything is run. If the check fails nothing runs.
 #
 # Recommended command (works on Windows PowerShell 5.1 and 7, any TLS default):
 #   [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; $r=(iwr -UseBasicParsing https://jlesc2026.github.io/toolkit).Content; if($r -is [byte[]]){$r=[Text.Encoding]::UTF8.GetString($r)}; iex $r.TrimStart([char]0xFEFF)
@@ -8,30 +14,120 @@
 
 $PayloadOwner  = 'JLESC2026'
 $PayloadRepo   = 'IT-Tech-Support-Tool-Kit'
-$PayloadBranch = 'main'
 
 $ErrorActionPreference = 'Stop'
 try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch { }
 $ProgressPreference = 'SilentlyContinue'
 
 $installerSelfUrl = 'https://jlesc2026.github.io/toolkit'
-$zipUrl           = "https://github.com/$PayloadOwner/$PayloadRepo/archive/refs/heads/$PayloadBranch.zip"
+$manifestUrl      = 'https://jlesc2026.github.io/manifest.json'
+# Only release files from this repository are accepted, whatever the manifest says.
+$releasePrefix    = "https://github.com/$PayloadOwner/$PayloadRepo/releases/download/"
 
-# Everything lives under here while running, and the whole folder is deleted at the end.
-# Not the Desktop, not AppData/LocalAppData, not the user profile. Hidden + admin-only while it exists.
-$vaultRoot = Join-Path $env:ProgramData 'ITTK'
+# Each run gets its own randomly named folder under ProgramData while running, and that folder is deleted
+# at the end. Not the Desktop, not AppData/LocalAppData, not the user profile. Hidden + admin-only while it exists.
+$workPrefix = 'ITTK'
 
 function Write-Step { param([string]$m) Write-Host "[ITTK] $m" -ForegroundColor Cyan }
+function Write-StepWarn { param([string]$m) Write-Host "[ITTK] WARNING: $m" -ForegroundColor Yellow }
 function Stop-Pause { param([string]$m) Write-Host "[ITTK] $m" -ForegroundColor Yellow; Read-Host 'Press Enter to close' | Out-Null }
 
+function Get-WebText {
+    param([string]$Url)
+    $r = (Invoke-WebRequest -UseBasicParsing -Uri $Url).Content
+    if ($r -is [byte[]]) { $r = [Text.Encoding]::UTF8.GetString($r) }
+    return ([string]$r).TrimStart([char]0xFEFF)
+}
+
+# Folder owner must be SYSTEM, Administrators or the current user; anything else means it was pre-planted.
+function Test-TrustedOwner {
+    param([string]$Path)
+    try {
+        $sid = (Get-Acl -LiteralPath $Path -ErrorAction Stop).GetOwner([Security.Principal.SecurityIdentifier]).Value
+    } catch { return $false }
+    $allowed = @('S-1-5-18', 'S-1-5-32-544', [Security.Principal.WindowsIdentity]::GetCurrent().User.Value)
+    return ($allowed -contains $sid)
+}
+
+# Locks the folder down to SYSTEM + Administrators (+ the current user, so ITTK_NOADMIN mode can still use it).
 function Protect-Folder {
     param([string]$Path)
-    if (-not (Test-Path -LiteralPath $Path)) { New-Item -ItemType Directory -Path $Path -Force | Out-Null }
-    & icacls.exe $Path /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' | Out-Null
+    $me = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+    & icacls.exe $Path /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' "*${me}:(OI)(CI)F" | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "Could not restrict access to the working folder (icacls exit code $LASTEXITCODE)." }
     & attrib.exe +h +s $Path | Out-Null
 }
 
-# Don't let this session's commands land in PSReadLine's on-disk history file.
+# Brand-new, randomly named folder: refuses an existing path, reparse points and untrusted owners.
+function New-SecureWorkFolder {
+    $path = Join-Path $env:ProgramData ($workPrefix + '_' + [guid]::NewGuid().ToString('N'))
+    if (Test-Path -LiteralPath $path) { throw 'Refusing to use a working folder that already exists.' }
+    New-Item -ItemType Directory -Path $path | Out-Null   # no -Force on purpose: it must be new
+    Protect-Folder $path
+    $item = Get-Item -LiteralPath $path -Force
+    if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'The working folder is a reparse point (junction or link). Stopped.' }
+    if (-not (Test-TrustedOwner $path)) { throw 'The working folder is not owned by SYSTEM, Administrators or you. Stopped.' }
+    return $path
+}
+
+# 'yes' = a PowerShell process has this folder in its command line, 'no' = none, 'unknown' = could not tell.
+function Get-FolderUse {
+    param([string]$Path)
+    try {
+        $procs = @(Get-CimInstance Win32_Process -Filter "Name='powershell.exe' OR Name='pwsh.exe'" -ErrorAction Stop)
+    } catch { return 'unknown' }
+    foreach ($p in $procs) {
+        if ($p.ProcessId -ne $PID -and $p.CommandLine -and $p.CommandLine.IndexOf($Path, [StringComparison]::OrdinalIgnoreCase) -ge 0) { return 'yes' }
+    }
+    return 'no'
+}
+
+# Deletes a folder tree without ever following a junction or symbolic link: a link is removed itself,
+# never its target. Problems are collected in $script:CleanupErrors.
+function Remove-TreeSafe {
+    param([string]$Path)
+    $di = New-Object System.IO.DirectoryInfo $Path
+    if (-not $di.Exists) { return }
+    if ($di.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+        try { [System.IO.Directory]::Delete($Path) } catch { $script:CleanupErrors += "$Path : $($_.Exception.Message)" }
+        return
+    }
+    foreach ($e in @($di.GetFileSystemInfos())) {
+        try {
+            if ($e.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+                if ($e -is [System.IO.DirectoryInfo]) { [System.IO.Directory]::Delete($e.FullName) }
+                else { [System.IO.File]::Delete($e.FullName) }
+            } elseif ($e -is [System.IO.DirectoryInfo]) {
+                Remove-TreeSafe $e.FullName
+            } else {
+                $e.Attributes = [IO.FileAttributes]::Normal
+                $e.Delete()
+            }
+        } catch { $script:CleanupErrors += "$($e.FullName) : $($_.Exception.Message)" }
+    }
+    try {
+        $di.Attributes = [IO.FileAttributes]::Normal
+        $di.Delete()
+    } catch { $script:CleanupErrors += "$Path : $($_.Exception.Message)" }
+}
+
+# Leftovers from crashed or closed-window sessions (including the old fixed 'ITTK' folder). A folder is only
+# removed when it is old enough, no toolkit process is using it, it is not a link and its owner is trusted.
+function Remove-StaleRuns {
+    $dirs = @(Get-ChildItem -LiteralPath $env:ProgramData -Directory -Force -Filter "$workPrefix*" -ErrorAction SilentlyContinue)
+    foreach ($d in $dirs) {
+        if ($d.Attributes -band [IO.FileAttributes]::ReparsePoint) { Write-StepWarn "Skipped $($d.FullName): it is a link, not a folder."; continue }
+        if ($d.LastWriteTime -gt (Get-Date).AddMinutes(-15)) { continue }
+        if ((Get-FolderUse $d.FullName) -ne 'no') { continue }
+        if (-not (Test-TrustedOwner $d.FullName)) { Write-StepWarn "Skipped $($d.FullName): owner is not trusted."; continue }
+        $script:CleanupErrors = @()
+        Remove-TreeSafe $d.FullName
+        if (Test-Path -LiteralPath $d.FullName) { Write-StepWarn "Could not remove an old session folder: $($d.FullName)" }
+    }
+}
+
+# Note: the command you typed to start this is saved in the shell history when you press Enter, so this
+# only stops the commands that follow it in THIS session from being written to PSReadLine's history file.
 try {
     Set-PSReadLineOption -HistorySaveStyle SaveNothing -ErrorAction Stop
 } catch { }
@@ -42,6 +138,7 @@ if ($env:OS -ne 'Windows_NT') {
 }
 
 # ---------- Elevate (required for IT repair tools) ----------
+# The elevated copy does its own download and hash check; nothing downloaded by this unelevated copy is ever run as admin.
 $id = [Security.Principal.WindowsIdentity]::GetCurrent()
 $isAdmin = (New-Object Security.Principal.WindowsPrincipal($id)).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 if (-not $isAdmin -and $env:ITTK_NOADMIN -ne '1') {
@@ -64,23 +161,41 @@ if (-not $isAdmin -and $env:ITTK_NOADMIN -ne '1') {
 }
 
 $tmp = $null
+$script:CleanupErrors = @()
 try {
-    Protect-Folder $vaultRoot
-
-    # Remove leftovers from any earlier crashed session before starting
-    Get-ChildItem -LiteralPath $vaultRoot -Directory -Filter 'run_*' -ErrorAction SilentlyContinue |
-        ForEach-Object { Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction SilentlyContinue }
-
-    $tmp = Join-Path $vaultRoot ('run_' + [guid]::NewGuid().ToString('N'))
-    New-Item -ItemType Directory -Path $tmp -Force | Out-Null
+    Remove-StaleRuns
+    $tmp = New-SecureWorkFolder
     $zip = Join-Path $tmp 'toolkit.zip'
 
-    Write-Step "Downloading toolkit from $PayloadRepo..."
+    Write-Step 'Checking the published release...'
+    try {
+        $m = (Get-WebText $manifestUrl) | ConvertFrom-Json
+    } catch {
+        throw "Could not read the release manifest ($($_.Exception.Message)). Check internet/proxy/firewall access to jlesc2026.github.io. Nothing was run."
+    }
+    if ([int]$m.schema -ne 1 -or -not $m.toolkit -or -not $m.toolkit.url -or -not $m.toolkit.sha256) {
+        throw 'The release manifest is not in the expected format. Nothing was run.'
+    }
+    $zipUrl = [string]$m.toolkit.url
+    if (-not $zipUrl.StartsWith($releasePrefix, [StringComparison]::Ordinal)) {
+        throw "The manifest points outside $releasePrefix - refusing to download. Nothing was run."
+    }
+    $expected = ([string]$m.toolkit.sha256).Trim().ToLowerInvariant()
+    if ($expected -notmatch '^[0-9a-f]{64}$') { throw 'The manifest does not contain a valid SHA-256 value. Nothing was run.' }
+
+    Write-Step "Downloading toolkit $($m.version) from $PayloadRepo..."
     try {
         Invoke-WebRequest -Uri $zipUrl -OutFile $zip -UseBasicParsing
     } catch {
-        throw "Download failed ($($_.Exception.Message)). If this says 404, the GitHub repo is private - it must be public for this link to work. Otherwise check internet/proxy/firewall access to github.com."
+        throw "Download failed ($($_.Exception.Message)). If this says 404, the release or the GitHub repo is missing or private. Otherwise check internet/proxy/firewall access to github.com."
     }
+
+    $actual = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($actual -ne $expected) {
+        Remove-Item -LiteralPath $zip -Force -ErrorAction SilentlyContinue
+        throw "INTEGRITY CHECK FAILED: the download does not match the published SHA-256. Nothing was run. Expected $expected but got $actual."
+    }
+    Write-Step "Integrity verified (SHA-256 $($actual.Substring(0, 16))...)."
 
     Write-Step 'Extracting...'
     $extract = Join-Path $tmp 'x'
@@ -95,7 +210,8 @@ try {
 
     Get-ChildItem -LiteralPath $src.FullName -Recurse -File -ErrorAction SilentlyContinue | Unblock-File -ErrorAction SilentlyContinue
 
-    # Logging to disk is switched off for this run - nothing in Logs\ or Reports\ survives the session.
+    # Logging to disk is switched off for this run - nothing in Logs\ is written. Reports saved during the
+    # session still go inside the temporary folder and are deleted with it.
     $env:TOOLKIT_LOG = '0'
 
     Write-Step 'Launching toolkit... (keep this window open during the support session)'
@@ -103,22 +219,37 @@ try {
     Start-Process -FilePath $ps -WorkingDirectory (Split-Path $toolkitScript) `
         -ArgumentList "-NoProfile -ExecutionPolicy Bypass -STA -File `"$toolkitScript`"" -Wait
 
+    # With ITTK_NOADMIN=1 the toolkit's "Relaunch as admin" button closes the copy started above and starts an
+    # elevated one, so the -Wait above returns while the toolkit is still running. Wait for every copy to finish.
+    Start-Sleep -Seconds 2
+    $announced = $false
+    while ((Get-FolderUse $tmp) -eq 'yes') {
+        if (-not $announced) { Write-Step 'Waiting for the elevated toolkit window to close...'; $announced = $true }
+        Start-Sleep -Seconds 2
+    }
+
     Write-Step 'Toolkit session ended.'
 } catch {
     Stop-Pause "Error: $($_.Exception.Message)"
 } finally {
-    if ($tmp -and (Test-Path -LiteralPath $tmp)) {
-        # Clear read-only/hidden/system flags recursively so Remove-Item can delete everything, then wipe it.
-        try {
-            Get-ChildItem -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue |
-                ForEach-Object { $_.Attributes = 'Normal' }
-        } catch { }
-        Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+    if ($tmp) {
+        if (Test-Path -LiteralPath $tmp) {
+            $use = Get-FolderUse $tmp
+            if ($use -eq 'no') {
+                $script:CleanupErrors = @()
+                Remove-TreeSafe $tmp
+            } elseif ($use -eq 'yes') {
+                Write-StepWarn 'The toolkit is still running, so its temporary folder was NOT deleted.'
+            } else {
+                Write-StepWarn 'Could not confirm that the toolkit has stopped, so its temporary folder was NOT deleted.'
+            }
+        }
+        if (Test-Path -LiteralPath $tmp) {
+            Write-StepWarn "The temporary folder is still on this computer: $tmp"
+            foreach ($err in @($script:CleanupErrors | Select-Object -First 5)) { Write-Host "         $err" -ForegroundColor Yellow }
+            Write-Host '         Close anything using it and delete it, or run this command again - old folders are removed at the start of the next run.' -ForegroundColor Yellow
+        } else {
+            Write-Step 'Cleanup verified: the temporary toolkit folder no longer exists. Windows and security-software logs are not affected.'
+        }
     }
-    # Remove the parent vault folder too if nothing else is using it (e.g. a concurrent session).
-    if ((Test-Path -LiteralPath $vaultRoot) -and -not (Get-ChildItem -LiteralPath $vaultRoot -Force -ErrorAction SilentlyContinue)) {
-        try { & attrib.exe -h -s $vaultRoot | Out-Null } catch { }
-        Remove-Item -LiteralPath $vaultRoot -Recurse -Force -ErrorAction SilentlyContinue
-    }
-    Write-Step 'Cleanup complete. No toolkit files remain on this computer.'
 }
