@@ -19,7 +19,7 @@ These are the commands recommended in the launchers' own headers. They set TLS 1
 # Online run of the support dashboard (asks for administrator rights)
 [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; $r=(iwr -UseBasicParsing https://jlesc2026.github.io/toolkit).Content; if($r -is [byte[]]){$r=[Text.Encoding]::UTF8.GetString($r)}; iex $r.TrimStart([char]0xFEFF)
 
-# Online run of the read-only PC assessment (report is saved to the Desktop)
+# Online run of the read-only PC assessment (asks where to save the report)
 [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; $r=(iwr -UseBasicParsing https://jlesc2026.github.io/assess).Content; if($r -is [byte[]]){$r=[Text.Encoding]::UTF8.GetString($r)}; iex $r.TrimStart([char]0xFEFF)
 
 # Build or update the flash-drive copy (no administrator rights needed)
@@ -38,8 +38,8 @@ The online mode runs from a temporary protected folder and deletes it on exit. I
 
 - **It does:** download a verified release into a new, randomly named folder under `C:\ProgramData` (hidden, administrators and SYSTEM only, links refused), switch the toolkit's disk logging off, delete the folder when you close the toolkit, and then **check** that it is gone and tell you if anything remains.
 - **It does not affect:** the command you typed (it may already be saved in your shell history), Windows event logs, PowerShell or process-creation logging if a policy enables it, antivirus or EDR history, Prefetch, UserAssist, the DNS cache, or UAC prompts.
-- **Reports made during the session are deleted with the folder.** Copy out anything you need (for example from Diagnostics > Computer Information) before you close the toolkit.
-- **The assessment is different:** its HTML report is saved to the Desktop and is kept. It contains the computer name, user name, serial number and MAC addresses.
+- **Reports made during the session are deleted with the folder, but you are asked first.** When you close the toolkit it offers to save them to a folder or USB drive you choose, or to `Documents\ITTK-Reports`, and it only deletes after the copy is verified. If saving fails, the folder is kept rather than lost silently.
+- **The assessment asks where its report goes:** a folder or USB drive you choose, the Desktop, or "show it, then delete it" (a one-off folder in `%TEMP%` that is deleted after you press Enter). The report contains the computer name, user name, serial number and MAC addresses.
 
 
 
@@ -59,7 +59,7 @@ You can also run the script directly:
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Assess\Assess.ps1
 ```
 
-The online run saves the report to the Desktop; a local run saves it under `Assess\Reports`. Use `-OutDir <folder>` to choose another location, or `-NoOpen` to keep the report from opening automatically. The report includes identifying information such as the computer and user names, serial number and MAC addresses; share it only with people authorized to support that PC.
+The online run asks where to save the report (set `$env:ITTK_ASSESS_OUT` to a folder first to skip the question); a local run saves it under `Assess\Reports`. Use `-OutDir <folder>` to choose another location, or `-NoOpen` to keep the report from opening automatically. The report includes identifying information such as the computer and user names, serial number and MAC addresses; share it only with people authorized to support that PC.
 
 ## IT Technician Toolkit
 

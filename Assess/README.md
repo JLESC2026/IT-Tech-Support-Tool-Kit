@@ -9,4 +9,4 @@ Run locally: double-click `Assess.bat`, or `powershell -ExecutionPolicy Bypass -
 
 The short-link launcher source is `ShortLinks\assess` in the repository. The release workflow publishes it to the website as `/assess`; keep it outside the repository root to avoid a Windows filename collision with this `Assess` folder.
 
-Report goes to the Desktop (web run) or `Assess\Reports` (local run). It contains serial number and MAC addresses.
+The web run asks where the report should go (a folder or USB drive you choose, the Desktop, or show-then-delete); a local run saves it under `Assess\Reports`. It contains serial number and MAC addresses.

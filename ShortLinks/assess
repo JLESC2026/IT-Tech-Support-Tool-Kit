@@ -10,9 +10,9 @@
 # assessment from a published release, checks its SHA-256 hash against
 # https://jlesc2026.github.io/manifest.json, and runs it from a new, randomly named, administrators-only
 # folder under C:\ProgramData - never from %TEMP%, which a standard user can write to.
-# The folder is deleted afterwards and the deletion is verified. The HTML report is saved to the Desktop of
-# the user who started the launcher and is KEPT: it contains the computer name, user, serial number and
-# MAC addresses.
+# The folder is deleted afterwards and the deletion is verified. The HTML report contains the computer name,
+# user, serial number and MAC addresses, so the launcher ASKS where it should go: a folder or USB drive you
+# choose, the Desktop, or 'show it, then delete it'. To skip the question set $env:ITTK_ASSESS_OUT to a folder first.
 
 $PayloadOwner = 'JLESC2026'
 $PayloadRepo  = 'IT-Tech-Support-Tool-Kit'
@@ -34,26 +34,88 @@ $workPrefix    = 'ITTK_assess'
 function Write-Step { param([string]$m) Write-Host "[ASSESS] $m" -ForegroundColor Cyan }
 function Write-StepWarn { param([string]$m) Write-Host "[ASSESS] WARNING: $m" -ForegroundColor Yellow }
 
-# ---------- Elevate first: nothing is downloaded or run by the unelevated copy ----------
+function Read-ReportChoice {
+    Write-Host ''
+    Write-Host '[ASSESS] The report contains the computer name, user name, serial number and MAC addresses.' -ForegroundColor Yellow
+    while ($true) {
+        Write-Host '  [1] Save it to a folder or USB drive I choose'
+        Write-Host '  [2] Save it to this PC''s Desktop (it stays there until you delete it)'
+        Write-Host '  [3] Just show it to me, then delete it'
+        $ans = (Read-Host 'Where should the report go? Choose 1, 2 or 3').Trim()
+        if ($ans -eq '1') {
+            $picked = $null
+            try {
+                Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
+                $owner = New-Object System.Windows.Forms.Form
+                $owner.TopMost = $true; $owner.ShowInTaskbar = $false; $owner.WindowState = 'Minimized'; $owner.Show()
+                $dlg = New-Object System.Windows.Forms.FolderBrowserDialog
+                $dlg.Description = 'Choose a folder or USB drive for the assessment report'
+                if ($dlg.ShowDialog($owner) -eq [System.Windows.Forms.DialogResult]::OK) { $picked = $dlg.SelectedPath }
+                $owner.Dispose()
+            } catch {
+                $picked = (Read-Host 'Type a drive or folder path (for example E:\)').Trim().Trim('"')
+            }
+            if ($picked -and (Test-Path -LiteralPath $picked -PathType Container)) {
+                return [pscustomobject]@{ Path = $picked; DeleteAfter = $false }
+            }
+            Write-Host 'No usable folder chosen.' -ForegroundColor Yellow
+        } elseif ($ans -eq '2') {
+            $d = [Environment]::GetFolderPath('Desktop')
+            if (-not $d -or -not (Test-Path -LiteralPath $d -PathType Container)) { $d = Join-Path $env:USERPROFILE 'Documents' }
+            return [pscustomobject]@{ Path = $d; DeleteAfter = $false }
+        } elseif ($ans -eq '3') {
+            $t = Join-Path $env:TEMP ('ITTK_report_' + [guid]::NewGuid().ToString('N'))
+            New-Item -ItemType Directory -Path $t | Out-Null
+            return [pscustomobject]@{ Path = $t; DeleteAfter = $true }
+        }
+    }
+}
+
+# Asks the user to finish viewing, then deletes the one-off report folder and says whether it worked.
+function Remove-ViewOnlyReport {
+    param([string]$Path, [bool]$Ask)
+    if (-not (Test-Path -LiteralPath $Path)) { return }
+    # Safety: only ever delete the one-off folder this launcher created in %TEMP%.
+    $leaf = Split-Path -Leaf $Path
+    $parent = (Split-Path -Parent $Path).TrimEnd('\')
+    if ($leaf -notlike 'ITTK_report_*' -or $parent -ne ([string]$env:TEMP).TrimEnd('\')) { return }
+    if ($Ask -and @(Get-ChildItem -LiteralPath $Path -Force -ErrorAction SilentlyContinue).Count -gt 0) {
+        Write-Host "[ASSESS] The report is in: $Path" -ForegroundColor Cyan
+        Read-Host 'Press Enter when you have finished viewing it, and it will be deleted' | Out-Null
+    }
+    try { Remove-Item -LiteralPath $Path -Recurse -Force -ErrorAction Stop } catch { }
+    if (Test-Path -LiteralPath $Path) { Write-StepWarn "Could not delete the report folder: $Path" }
+    elseif ($Ask) { Write-Step 'The report was deleted.' }
+}
+
+# ---------- Where does the report go? (asked once, before anything is downloaded) ----------
 $id = [Security.Principal.WindowsIdentity]::GetCurrent()
 $isAdmin = (New-Object Security.Principal.WindowsPrincipal($id)).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+$outDir = $env:ITTK_ASSESS_OUT
+$deleteAfter = $false
+if (-not $outDir) {
+    $choice = Read-ReportChoice
+    $outDir = $choice.Path
+    $deleteAfter = $choice.DeleteAfter
+}
+
+# ---------- Elevate first: nothing is downloaded or run by the unelevated copy ----------
 if (-not $isAdmin) {
-    $desktop = [Environment]::GetFolderPath('Desktop')
-    if (-not $desktop -or -not (Test-Path -LiteralPath $desktop -PathType Container)) { $desktop = Join-Path $env:USERPROFILE 'Documents' }
     Write-Step 'Requesting administrator elevation...'
     try {
-        $safeDesktop = $desktop.Replace("'", "''")
+        $safeOut = ([string]$outDir).Replace("'", "''")
         $boot = "[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; " +
-                "`$env:ITTK_ASSESS_OUT='$safeDesktop'; " +
+                "`$env:ITTK_ASSESS_OUT='$safeOut'; " +
                 "`$r=(Invoke-WebRequest -UseBasicParsing '$selfUrl').Content; " +
                 "if(`$r -is [byte[]]){`$r=[Text.Encoding]::UTF8.GetString(`$r)}; " +
                 "Invoke-Expression `$r.TrimStart([char]0xFEFF)"
         $enc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($boot))
         $psExe = (Get-Process -Id $PID).Path
-        Start-Process -FilePath $psExe -Verb RunAs -ArgumentList "-NoProfile -ExecutionPolicy Bypass -EncodedCommand $enc"
+        Start-Process -FilePath $psExe -Verb RunAs -Wait -ArgumentList "-NoProfile -ExecutionPolicy Bypass -EncodedCommand $enc"
     } catch {
         Write-Host "[ASSESS] Elevation cancelled or blocked: $($_.Exception.Message)" -ForegroundColor Red
     }
+    if ($deleteAfter) { Remove-ViewOnlyReport -Path $outDir -Ask $true }
     return
 }
 
@@ -125,11 +187,11 @@ function Remove-StaleRuns {
     }
 }
 
-# Report folder: handed over by the unelevated copy, checked to be a real folder (not a link).
-$outDir = $env:ITTK_ASSESS_OUT
+# Report folder: chosen above (or handed over by the unelevated copy), checked to be a real folder (not a link).
 Remove-Item Env:\ITTK_ASSESS_OUT -ErrorAction SilentlyContinue
 if (-not $outDir -or -not (Test-Path -LiteralPath $outDir -PathType Container) -or
     ((Get-Item -LiteralPath $outDir -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+    $deleteAfter = $false   # never delete a fallback folder
     $outDir = [Environment]::GetFolderPath('Desktop')
     if (-not $outDir -or -not (Test-Path -LiteralPath $outDir -PathType Container)) { $outDir = Join-Path $env:USERPROFILE 'Documents' }
 }
@@ -185,7 +247,9 @@ try {
             foreach ($err in @($script:CleanupErrors | Select-Object -First 5)) { Write-Host "         $err" -ForegroundColor Yellow }
             Write-Host '         It is removed at the start of the next run, or you can delete it yourself.' -ForegroundColor Yellow
         } else {
-            Write-Step 'Cleanup verified: the temporary folder no longer exists. The report was kept in the report folder.'
+            Write-Step 'Cleanup verified: the temporary folder no longer exists.'
         }
     }
+    if ($deleteAfter) { Remove-ViewOnlyReport -Path $outDir -Ask $true }
+    elseif ($outDir) { Write-Step "The report was saved in: $outDir (it contains the serial number and MAC addresses)." }
 }

@@ -3,7 +3,8 @@
 # Windows and security-software records are NOT affected: event logs, PowerShell / process-creation
 # logging, antivirus or EDR history, Prefetch, the DNS cache and UAC prompts stay as they are, and the
 # command you typed may already be saved in your shell history. Logs and reports made during the
-# session are deleted with the folder, so copy out anything you need before closing the toolkit.
+# session are deleted with the folder; when you close the toolkit it offers to save any reports to a folder
+# or USB drive first.
 #
 # Integrity: the toolkit is downloaded as a published release and its SHA-256 hash is checked against
 # https://jlesc2026.github.io/manifest.json before anything is run. If the check fails nothing runs.
@@ -126,6 +127,66 @@ function Remove-StaleRuns {
     }
 }
 
+# Asks what to do with reports made during the session, BEFORE the temporary folder is deleted.
+# Returns $true when it is safe to delete (saved and verified, or the user chose to discard).
+function Export-SessionReports {
+    param([string]$ReportsDir, [string]$WorkFolder)
+    if (-not (Test-Path -LiteralPath $ReportsDir -PathType Container)) { return $true }
+    $files = @(Get-ChildItem -LiteralPath $ReportsDir -Recurse -File -Force -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -ne '.keep' -and -not ($_.Attributes -band [IO.FileAttributes]::ReparsePoint) })
+    if ($files.Count -eq 0) { return $true }
+
+    Write-Host ''
+    Write-Host "[ITTK] This session created $($files.Count) report file(s). They are deleted with the temporary folder." -ForegroundColor Yellow
+    Write-Host '       Reports hold the computer name, serial number and network details. Prefer a USB drive you own.' -ForegroundColor Yellow
+    while ($true) {
+        Write-Host '  [1] Choose a folder or USB drive to save them to'
+        Write-Host '  [2] Save to Documents\ITTK-Reports on this PC'
+        Write-Host '  [3] Discard them (they are deleted)'
+        $ans = (Read-Host 'Choose 1, 2 or 3').Trim()
+        $target = $null
+        if ($ans -eq '3') { return $true }
+        elseif ($ans -eq '2') { $target = [Environment]::GetFolderPath('MyDocuments') }
+        elseif ($ans -eq '1') {
+            try {
+                Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
+                $owner = New-Object System.Windows.Forms.Form
+                $owner.TopMost = $true; $owner.ShowInTaskbar = $false; $owner.WindowState = 'Minimized'; $owner.Show()
+                $dlg = New-Object System.Windows.Forms.FolderBrowserDialog
+                $dlg.Description = 'Choose a folder or USB drive for the session reports'
+                if ($dlg.ShowDialog($owner) -eq [System.Windows.Forms.DialogResult]::OK) { $target = $dlg.SelectedPath }
+                $owner.Dispose()
+            } catch {
+                $target = (Read-Host 'Type a drive or folder path (for example E:\)').Trim().Trim('"')
+            }
+            if (-not $target) { Write-Host 'No folder chosen.' -ForegroundColor Yellow; continue }
+        } else { continue }
+
+        try {
+            if (-not (Test-Path -LiteralPath $target -PathType Container)) { throw "The folder '$target' does not exist." }
+            $full = [IO.Path]::GetFullPath($target).TrimEnd('\') + '\'
+            if ($full.StartsWith(([IO.Path]::GetFullPath($WorkFolder).TrimEnd('\') + '\'), [StringComparison]::OrdinalIgnoreCase)) {
+                throw 'That folder is inside the temporary folder, which is about to be deleted. Choose another place.'
+            }
+            $dest = Join-Path $target ('ITTK-Reports\' + $env:COMPUTERNAME + '_' + (Get-Date -Format 'yyyy-MM-dd_HHmm'))
+            New-Item -ItemType Directory -Path $dest -Force | Out-Null
+            $root = [IO.Path]::GetFullPath($ReportsDir).TrimEnd('\')
+            foreach ($f in $files) {
+                $rel = $f.FullName.Substring($root.Length).TrimStart('\')
+                $to = Join-Path $dest $rel
+                $parent = Split-Path -Parent $to
+                if (-not (Test-Path -LiteralPath $parent)) { New-Item -ItemType Directory -Path $parent -Force | Out-Null }
+                Copy-Item -LiteralPath $f.FullName -Destination $to -Force
+                if (-not (Test-Path -LiteralPath $to) -or (Get-Item -LiteralPath $to).Length -ne $f.Length) { throw "Could not verify the copy of $rel." }
+            }
+            Write-Step "Saved and verified $($files.Count) file(s) in: $dest"
+            return $true
+        } catch {
+            Write-StepWarn "Could not save the reports: $($_.Exception.Message) Choose again, or discard."
+        }
+    }
+}
+
 # Note: the command you typed to start this is saved in the shell history when you press Enter, so this
 # only stops the commands that follow it in THIS session from being written to PSReadLine's history file.
 try {
@@ -162,6 +223,7 @@ if (-not $isAdmin -and $env:ITTK_NOADMIN -ne '1') {
 
 $tmp = $null
 $script:CleanupErrors = @()
+$script:KeepFolder = $false
 try {
     Remove-StaleRuns
     $tmp = New-SecureWorkFolder
@@ -211,7 +273,7 @@ try {
     Get-ChildItem -LiteralPath $src.FullName -Recurse -File -ErrorAction SilentlyContinue | Unblock-File -ErrorAction SilentlyContinue
 
     # Logging to disk is switched off for this run - nothing in Logs\ is written. Reports saved during the
-    # session still go inside the temporary folder and are deleted with it.
+    # session still go inside the temporary folder; you are asked to save them when the toolkit closes.
     $env:TOOLKIT_LOG = '0'
 
     Write-Step 'Launching toolkit... (keep this window open during the support session)'
@@ -229,13 +291,24 @@ try {
     }
 
     Write-Step 'Toolkit session ended.'
+    # Offer to save the session's reports before the folder is deleted. If saving fails and the user can't resolve it,
+    # the folder is kept (not deleted) so nothing is lost silently.
+    try {
+        $reportsDir = Join-Path (Split-Path (Split-Path $toolkitScript -Parent) -Parent) 'Reports'
+        if (-not (Export-SessionReports -ReportsDir $reportsDir -WorkFolder $tmp)) { $script:KeepFolder = $true }
+    } catch {
+        $script:KeepFolder = $true
+        Write-StepWarn "The report export step failed ($($_.Exception.Message)). The temporary folder will be kept so nothing is lost."
+    }
 } catch {
     Stop-Pause "Error: $($_.Exception.Message)"
 } finally {
     if ($tmp) {
         if (Test-Path -LiteralPath $tmp) {
             $use = Get-FolderUse $tmp
-            if ($use -eq 'no') {
+            if ($script:KeepFolder) {
+                Write-StepWarn 'The temporary folder was kept on purpose because the session reports could not be exported.'
+            } elseif ($use -eq 'no') {
                 $script:CleanupErrors = @()
                 Remove-TreeSafe $tmp
             } elseif ($use -eq 'yes') {
