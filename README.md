@@ -190,6 +190,6 @@ This toolkit can change Windows services, networking, system files and device se
 
 - **Use it only on computers you are authorized to support.** The tools can change services, networking, system files and devices.
 - **No warranty.** The toolkit is provided as is. Test it on a spare PC or virtual machine first.
-- **License:** not yet specified. Until a license file is added, contact the repository owner before redistributing or reusing the code.
+- **License:** [MIT](LICENSE). You may use, copy, modify and share it, including at work, as long as the copyright notice stays. It comes with no warranty. Bundled third-party tools are not included; each has its own license.
 - **Found a security problem?** See [SECURITY.md](SECURITY.md).
 - **Third-party tools** are never bundled here. You download portable apps from their official sites and check each licence yourself.
