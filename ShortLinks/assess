@@ -3,8 +3,16 @@
 # a case-insensitive "assess" file in the repository root. The release workflow publishes
 # this file as /assess in the JLESC2026.github.io repository.
 #
-# Run: irm jlesc2026.github.io/assess | iex
-# The assessment is downloaded from a published release and SHA-256 checked before it runs.
+# Recommended command (works on Windows PowerShell 5.1 and 7, any TLS default):
+#   [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; $r=(iwr -UseBasicParsing https://jlesc2026.github.io/assess).Content; if($r -is [byte[]]){$r=[Text.Encoding]::UTF8.GetString($r)}; iex $r.TrimStart([char]0xFEFF)
+#
+# How it runs: this launcher asks for administrator rights FIRST. The elevated copy then downloads the
+# assessment from a published release, checks its SHA-256 hash against
+# https://jlesc2026.github.io/manifest.json, and runs it from a new, randomly named, administrators-only
+# folder under C:\ProgramData - never from %TEMP%, which a standard user can write to.
+# The folder is deleted afterwards and the deletion is verified. The HTML report is saved to the Desktop of
+# the user who started the launcher and is KEPT: it contains the computer name, user, serial number and
+# MAC addresses.
 
 $PayloadOwner = 'JLESC2026'
 $PayloadRepo  = 'IT-Tech-Support-Tool-Kit'
@@ -18,74 +26,166 @@ if ($env:OS -ne 'Windows_NT') {
     return
 }
 
-$manifestUrl = 'https://jlesc2026.github.io/manifest.json'
+$selfUrl       = 'https://jlesc2026.github.io/assess'
+$manifestUrl   = 'https://jlesc2026.github.io/manifest.json'
 $releasePrefix = "https://github.com/$PayloadOwner/$PayloadRepo/releases/download/"
-$tempRoot = Join-Path $env:TEMP ('assess_' + [guid]::NewGuid().ToString('N'))
+$workPrefix    = 'ITTK_assess'
 
-try {
-    New-Item -ItemType Directory -Path $tempRoot | Out-Null
-    $assessmentScript = Join-Path $tempRoot 'Assess.ps1'
+function Write-Step { param([string]$m) Write-Host "[ASSESS] $m" -ForegroundColor Cyan }
+function Write-StepWarn { param([string]$m) Write-Host "[ASSESS] WARNING: $m" -ForegroundColor Yellow }
 
-    Write-Host '[ASSESS] Checking the published release...' -ForegroundColor Cyan
-    $response = Invoke-WebRequest -Uri $manifestUrl -UseBasicParsing
-    $manifestText = $response.Content
-    if ($manifestText -is [byte[]]) { $manifestText = [Text.Encoding]::UTF8.GetString($manifestText) }
-    $manifest = ([string]$manifestText).TrimStart([char]0xFEFF) | ConvertFrom-Json
-
-    if ([int]$manifest.schema -ne 1 -or -not $manifest.assess -or -not $manifest.assess.url -or -not $manifest.assess.sha256) {
-        throw 'The release manifest is not in the expected format.'
+# ---------- Elevate first: nothing is downloaded or run by the unelevated copy ----------
+$id = [Security.Principal.WindowsIdentity]::GetCurrent()
+$isAdmin = (New-Object Security.Principal.WindowsPrincipal($id)).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+if (-not $isAdmin) {
+    $desktop = [Environment]::GetFolderPath('Desktop')
+    if (-not $desktop -or -not (Test-Path -LiteralPath $desktop -PathType Container)) { $desktop = Join-Path $env:USERPROFILE 'Documents' }
+    Write-Step 'Requesting administrator elevation...'
+    try {
+        $safeDesktop = $desktop.Replace("'", "''")
+        $boot = "[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; " +
+                "`$env:ITTK_ASSESS_OUT='$safeDesktop'; " +
+                "`$r=(Invoke-WebRequest -UseBasicParsing '$selfUrl').Content; " +
+                "if(`$r -is [byte[]]){`$r=[Text.Encoding]::UTF8.GetString(`$r)}; " +
+                "Invoke-Expression `$r.TrimStart([char]0xFEFF)"
+        $enc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($boot))
+        $psExe = (Get-Process -Id $PID).Path
+        Start-Process -FilePath $psExe -Verb RunAs -ArgumentList "-NoProfile -ExecutionPolicy Bypass -EncodedCommand $enc"
+    } catch {
+        Write-Host "[ASSESS] Elevation cancelled or blocked: $($_.Exception.Message)" -ForegroundColor Red
     }
+    return
+}
 
+# ---------- Everything below runs elevated ----------
+function Get-WebText {
+    param([string]$Url)
+    $r = (Invoke-WebRequest -UseBasicParsing -Uri $Url).Content
+    if ($r -is [byte[]]) { $r = [Text.Encoding]::UTF8.GetString($r) }
+    return ([string]$r).TrimStart([char]0xFEFF)
+}
+
+function Test-TrustedOwner {
+    param([string]$Path)
+    try {
+        $sid = (Get-Acl -LiteralPath $Path -ErrorAction Stop).GetOwner([Security.Principal.SecurityIdentifier]).Value
+    } catch { return $false }
+    $allowed = @('S-1-5-18', 'S-1-5-32-544', [Security.Principal.WindowsIdentity]::GetCurrent().User.Value)
+    return ($allowed -contains $sid)
+}
+
+function New-SecureWorkFolder {
+    $path = Join-Path $env:ProgramData ($workPrefix + '_' + [guid]::NewGuid().ToString('N'))
+    if (Test-Path -LiteralPath $path) { throw 'Refusing to use a working folder that already exists.' }
+    New-Item -ItemType Directory -Path $path | Out-Null   # no -Force on purpose: it must be new
+    $me = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+    & icacls.exe $path /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' "*${me}:(OI)(CI)F" | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "Could not restrict access to the working folder (icacls exit code $LASTEXITCODE)." }
+    & attrib.exe +h +s $path | Out-Null
+    $item = Get-Item -LiteralPath $path -Force
+    if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'The working folder is a reparse point (junction or link). Stopped.' }
+    if (-not (Test-TrustedOwner $path)) { throw 'The working folder is not owned by SYSTEM, Administrators or you. Stopped.' }
+    return $path
+}
+
+# Deletes a folder tree without ever following a junction or symbolic link.
+function Remove-TreeSafe {
+    param([string]$Path)
+    $di = New-Object System.IO.DirectoryInfo $Path
+    if (-not $di.Exists) { return }
+    if ($di.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+        try { [System.IO.Directory]::Delete($Path) } catch { $script:CleanupErrors += "$Path : $($_.Exception.Message)" }
+        return
+    }
+    foreach ($e in @($di.GetFileSystemInfos())) {
+        try {
+            if ($e.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+                if ($e -is [System.IO.DirectoryInfo]) { [System.IO.Directory]::Delete($e.FullName) }
+                else { [System.IO.File]::Delete($e.FullName) }
+            } elseif ($e -is [System.IO.DirectoryInfo]) {
+                Remove-TreeSafe $e.FullName
+            } else {
+                $e.Attributes = [IO.FileAttributes]::Normal
+                $e.Delete()
+            }
+        } catch { $script:CleanupErrors += "$($e.FullName) : $($_.Exception.Message)" }
+    }
+    try { $di.Attributes = [IO.FileAttributes]::Normal; $di.Delete() } catch { $script:CleanupErrors += "$Path : $($_.Exception.Message)" }
+}
+
+# Old assess_* folders in %TEMP% from the previous launcher version are not touched; only our own folders here.
+function Remove-StaleRuns {
+    $dirs = @(Get-ChildItem -LiteralPath $env:ProgramData -Directory -Force -Filter "$workPrefix*" -ErrorAction SilentlyContinue)
+    foreach ($d in $dirs) {
+        if ($d.Attributes -band [IO.FileAttributes]::ReparsePoint) { continue }
+        if ($d.LastWriteTime -gt (Get-Date).AddMinutes(-15)) { continue }
+        if (-not (Test-TrustedOwner $d.FullName)) { continue }
+        $script:CleanupErrors = @()
+        Remove-TreeSafe $d.FullName
+    }
+}
+
+# Report folder: handed over by the unelevated copy, checked to be a real folder (not a link).
+$outDir = $env:ITTK_ASSESS_OUT
+Remove-Item Env:\ITTK_ASSESS_OUT -ErrorAction SilentlyContinue
+if (-not $outDir -or -not (Test-Path -LiteralPath $outDir -PathType Container) -or
+    ((Get-Item -LiteralPath $outDir -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+    $outDir = [Environment]::GetFolderPath('Desktop')
+    if (-not $outDir -or -not (Test-Path -LiteralPath $outDir -PathType Container)) { $outDir = Join-Path $env:USERPROFILE 'Documents' }
+}
+
+$tmp = $null
+$script:CleanupErrors = @()
+try {
+    Remove-StaleRuns
+    $tmp = New-SecureWorkFolder
+    $assessmentScript = Join-Path $tmp 'Assess.ps1'
+
+    Write-Step 'Checking the published release...'
+    try {
+        $manifest = (Get-WebText $manifestUrl) | ConvertFrom-Json
+    } catch {
+        throw "Could not read the release manifest ($($_.Exception.Message)). Check internet/proxy/firewall access to jlesc2026.github.io. Nothing was run."
+    }
+    if ([int]$manifest.schema -ne 1 -or -not $manifest.assess -or -not $manifest.assess.url -or -not $manifest.assess.sha256) {
+        throw 'The release manifest is not in the expected format. Nothing was run.'
+    }
     $scriptUrl = [string]$manifest.assess.url
     if (-not $scriptUrl.StartsWith($releasePrefix, [StringComparison]::Ordinal)) {
-        throw "The manifest points outside the approved release repository: $scriptUrl"
+        throw "The manifest points outside $releasePrefix - refusing to download. Nothing was run."
     }
     $expectedHash = ([string]$manifest.assess.sha256).Trim().ToLowerInvariant()
-    if ($expectedHash -notmatch '^[0-9a-f]{64}$') {
-        throw 'The manifest does not contain a valid SHA-256 value.'
-    }
+    if ($expectedHash -notmatch '^[0-9a-f]{64}$') { throw 'The manifest does not contain a valid SHA-256 value. Nothing was run.' }
 
-    Write-Host "[ASSESS] Downloading assessment $($manifest.version)..." -ForegroundColor Cyan
+    Write-Step "Downloading assessment $($manifest.version)..."
     Invoke-WebRequest -Uri $scriptUrl -OutFile $assessmentScript -UseBasicParsing
     if (-not (Test-Path -LiteralPath $assessmentScript) -or (Get-Item -LiteralPath $assessmentScript).Length -eq 0) {
-        throw 'The downloaded assessment script is empty.'
+        throw 'The downloaded assessment script is empty. Nothing was run.'
     }
     $actualHash = (Get-FileHash -LiteralPath $assessmentScript -Algorithm SHA256).Hash.ToLowerInvariant()
     if ($actualHash -ne $expectedHash) {
-        throw 'The assessment SHA-256 does not match the published manifest. Nothing was run.'
+        throw "INTEGRITY CHECK FAILED: the download does not match the published SHA-256. Nothing was run. Expected $expectedHash but got $actualHash."
     }
+    Write-Step "Integrity verified (SHA-256 $($actualHash.Substring(0, 16))...)."
 
-    $desktop = [Environment]::GetFolderPath('Desktop')
-    if (-not $desktop) { $desktop = $env:TEMP }
-    $arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$assessmentScript`" -OutDir `"$desktop`" -Pause"
-    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
-    $isAdmin = (New-Object Security.Principal.WindowsPrincipal($identity)).IsInRole(
-        [Security.Principal.WindowsBuiltInRole]::Administrator
-    )
-
-    Write-Host '[ASSESS] Starting read-only assessment...' -ForegroundColor Cyan
-    $startParams = @{
-        FilePath = (Get-Process -Id $PID).Path
-        ArgumentList = $arguments
-        Wait = $true
-        PassThru = $true
-    }
-    if (-not $isAdmin) { $startParams.Verb = 'RunAs' }
-    $process = Start-Process @startParams
-    if ($process.ExitCode -ne 0) {
-        throw "Assessment process exited with code $($process.ExitCode)."
-    }
+    Write-Step 'Starting read-only assessment...'
+    $ps = (Get-Process -Id $PID).Path
+    $p = Start-Process -FilePath $ps -Wait -PassThru `
+        -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$assessmentScript`" -OutDir `"$outDir`" -NoElevate -Pause"
+    if ($p.ExitCode -ne 0) { throw "Assessment process exited with code $($p.ExitCode)." }
 } catch {
     Write-Host "[ASSESS] Error: $($_.Exception.Message)" -ForegroundColor Red
+    Read-Host 'Press Enter to close' | Out-Null
 } finally {
-    if (Test-Path -LiteralPath $tempRoot) {
-        try {
-            Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction Stop
-            if (Test-Path -LiteralPath $tempRoot) {
-                Write-Host "[ASSESS] Warning: temporary files remain at $tempRoot" -ForegroundColor Yellow
-            }
-        } catch {
-            Write-Host "[ASSESS] Warning: could not remove temporary files at $tempRoot : $($_.Exception.Message)" -ForegroundColor Yellow
+    if ($tmp -and (Test-Path -LiteralPath $tmp)) {
+        $script:CleanupErrors = @()
+        Remove-TreeSafe $tmp
+        if (Test-Path -LiteralPath $tmp) {
+            Write-StepWarn "The temporary folder is still on this computer: $tmp"
+            foreach ($err in @($script:CleanupErrors | Select-Object -First 5)) { Write-Host "         $err" -ForegroundColor Yellow }
+            Write-Host '         It is removed at the start of the next run, or you can delete it yourself.' -ForegroundColor Yellow
+        } else {
+            Write-Step 'Cleanup verified: the temporary folder no longer exists. The report was kept in the report folder.'
         }
     }
 }
